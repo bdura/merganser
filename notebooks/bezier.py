@@ -110,6 +110,6 @@ class BezierLoss(object):
         se = ((curve - cloud) ** 2).mean(dim=-1)
         loss = se.min(dim=1)[0].mean()
 
-        loss = loss + se[:, [0, -1]].min(dim=0)[0].mean() * self.alpha
+        loss = loss + self.alpha * se[:, [0, -1]].min(dim=0)[0].mean()
 
         return loss
