@@ -35,7 +35,8 @@ def compute(t, controls):
 
 def compute_curve(controls):
     ts = np.linspace(0, 1, 100)
-    return np.array([compute(t, controls) for t in ts])
+    b = np.asarray([bernstein(t, len(controls)) for t in ts])
+    return b @ controls
 
 
 class Bezier(nn.Module):
@@ -50,6 +51,7 @@ class Bezier(nn.Module):
         if choice is None:
             controls = torch.randn((order, 2))
         else:
+            choice = torch.Tensor(choice)
             permutation = torch.randperm(choice.size(0))
             indices = permutation[:order]
 
@@ -61,6 +63,10 @@ class Bezier(nn.Module):
 
     def forward(self):
         return self.bernstein @ self.controls
+
+    def extrapolate(self, t0, t1):
+        controls = self.controls.data.numpy()
+        self.controls.data = torch.Tensor(extrapolate(controls, t0, t1))
 
 
 class BezierLoss(object):
@@ -113,3 +119,92 @@ class BezierLoss(object):
         loss = loss + self.alpha * se[:, [0, -1]].min(dim=0)[0].mean()
 
         return loss
+
+
+def decasteljau(controls, t, left=None, right=None):
+    """
+    Implements de Casteljau's algorithm to obtain the point at parameter value `t`.
+
+    It also provides the control points for the split Bezier curve
+    (if provided the two corresponding lists, which are populated).
+
+    Parameters
+    ----------
+    controls: np.array
+        The control points of the Bezier curve.
+    t: float
+        The parameter value to compute/on which to split.
+    left: list, optional
+        A python list to be populated with the new control points.
+    right: list, optional
+        A python list to be populated with the new control points.
+
+    Returns
+    -------
+    np.array
+        The point of the curve corresponding to parameter value t.
+    """
+    n = len(controls)
+
+    memory = left is not None and right is not None
+
+    if n == 1:
+        anchor = controls[0]
+        if memory:
+            left.append(anchor)
+            right.append(anchor)
+        return anchor
+    else:
+        left_anchors = controls[:n - 1]
+        right_anchors = controls[1:]
+
+        new_anchors = (1-t) * left_anchors + t * right_anchors
+
+        if memory:
+            left.append(controls[0])
+            right.append(controls[-1])
+
+        return decasteljau(new_anchors, t, left, right)
+
+
+def split(controls, t):
+    """
+    Splits a Bezier curve around the parameter value t.
+
+    Parameters
+    ----------
+    controls: np.array
+        The control points of the Bezier curve.
+    t: float
+        The parameter value to compute/on which to split.
+
+    Returns
+    -------
+    tuple(np.array)
+        The new control points.
+    """
+    left, right = [], []
+    decasteljau(controls, t, left, right)
+    return np.asarray(left), np.asarray(right)
+
+
+def extrapolate(controls, t0, t1):
+    """
+    Computes the new control points that "extrapolate" the Bezier curve from `t0` to `t1`.
+
+    Parameters
+    ----------
+    controls: np.array
+        The control points of the Bezier curve.
+    t0, t1: float
+        The parameter values to extrapolate between.
+
+    Returns
+    -------
+    new: np.array
+        The new control points.
+    """
+    assert t0 < t1
+    left, right = split(controls, t0)
+    new, _ = split(right[::-1], t1)
+    return new

@@ -3,5 +3,8 @@
 
 .ipynb_checkpoints/
 __pycache__/
+
 *.pyc
 *.mp4
+
+notebooks/output/
