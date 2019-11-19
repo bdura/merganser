@@ -17,12 +17,15 @@ class LineDetectorHSV(dtu.Configurable):
             'hsv_red1', 'hsv_red2',
             'hsv_red3', 'hsv_red4',
 
-            'kernel_size'
+            'kernel_size',
+            'large_kernel_size'
         ]
         super(LineDetectorHSV, self).__init__(params_names, configuration)
 
         self._kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
             (self.kernel_size, self.kernel_size))
+        self._large_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
+            (self.large_kernel_size, self.large_kernel_size))
 
     def color_filter(self, hsv_image):
         # The masks are eroded with a small kernel to remove their edges
@@ -36,8 +39,8 @@ class LineDetectorHSV(dtu.Configurable):
 
         # Filter yellow
         yellow_mask = cv2.inRange(hsv_image, self.hsv_yellow1, self.hsv_yellow2)
-        yellow_mask = cv2.dilate(yellow_mask, self._kernel, iterations=1)
-        yellow_mask = cv2.erode(yellow_mask, self._kernel, iterations=2)
+        yellow_mask = cv2.morphologyEx(yellow_mask, cv2.MORPH_CLOSE, self._large_kernel)
+        yellow_mask = cv2.erode(yellow_mask, self._kernel, iterations=1)
 
         # Filter red
         red_mask_1 = cv2.inRange(hsv_image, self.hsv_red1, self.hsv_red2)
@@ -68,4 +71,4 @@ class LineDetectorHSV(dtu.Configurable):
         # Get the skeletons
         skeletons = self.get_skeleton(color_masks)
 
-        return skeletons
+        return skeletons, color_masks

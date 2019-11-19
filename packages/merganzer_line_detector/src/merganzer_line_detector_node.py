@@ -30,6 +30,7 @@ class LineDetectorNode(object):
 
         # Publishers
         self.pub_skeletons = None
+        self.pub_masks = None
 
         self.update_params(None)
 
@@ -52,6 +53,9 @@ class LineDetectorNode(object):
             self.pub_skeletons = rospy.Publisher('~skeletons',
                                                  Image,
                                                  queue_size=1)
+            self.pub_masks = rospy.Publisher('~masks',
+                                             Image,
+                                             queue_size=1)
 
     def process_image(self, image_msg):
         # Decode the compressed image with OpenCV
@@ -69,13 +73,18 @@ class LineDetectorNode(object):
 
         image_cv = image_cv[self.top_cutoff:]
 
-        skeletons = self.detector.detect_lines(image_cv)
+        skeletons, masks = self.detector.detect_lines(image_cv)
 
         if self.verbose:
             skeletons_image = detections_to_image(skeletons)
             skeletons_msg = self.bridge.cv2_to_imgmsg(skeletons_image, 'bgr8')
             skeletons_msg.header.stamp = image_msg.header.stamp
             self.pub_skeletons.publish(skeletons_msg)
+
+            masks_image = detections_to_image(masks)
+            masks_msg = self.bridge.cv2_to_imgmsg(masks_image, 'bgr8')
+            masks_msg.header.stamp = image_msg.header.stamp
+            self.pub_masks.publish(masks_msg)
 
     def on_shutdown(self):
         self.loginfo('Shutdown...')
