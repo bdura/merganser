@@ -18,7 +18,8 @@ class LineDetectorHSV(dtu.Configurable):
             'hsv_red3', 'hsv_red4',
 
             'kernel_size',
-            'large_kernel_size'
+            'large_kernel_size',
+            'prune_kernel_size',
         ]
         super(LineDetectorHSV, self).__init__(params_names, configuration)
 
@@ -26,6 +27,8 @@ class LineDetectorHSV(dtu.Configurable):
             (self.kernel_size, self.kernel_size))
         self._large_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
             (self.large_kernel_size, self.large_kernel_size))
+        self._prune_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
+            (self.prune_kernel_size, self.prune_kernel_size))
 
     def color_filter(self, hsv_image):
         # The masks are eroded with a small kernel to remove their edges
@@ -51,6 +54,14 @@ class LineDetectorHSV(dtu.Configurable):
 
         return Detections(white=white_mask, yellow=yellow_mask, red=red_mask)
 
+    def prune_small_components(self, masks):
+        def _prune(mask):
+            return cv2.morphologyEx(mask, cv2.MORPH_OPEN, self._prune_kernel)
+
+        return Detections(white=_prune(masks.white),
+                          yellow=_prune(masks.yellow),
+                          red=_prune(masks.red))
+
     def get_skeleton(self, masks):
         # Combine all the masks into a single binary image
         binary_image = cv2.bitwise_or(masks.white, masks.yellow)
@@ -68,6 +79,8 @@ class LineDetectorHSV(dtu.Configurable):
         hsv_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
         # Filter the colors
         color_masks = self.color_filter(hsv_image)
+        # Prune the small components
+        color_masks = self.prune_small_components(color_masks)
         # Get the skeletons
         skeletons = self.get_skeleton(color_masks)
 
