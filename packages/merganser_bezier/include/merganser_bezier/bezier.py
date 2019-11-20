@@ -31,13 +31,13 @@ def compute(t, controls):
     n = len(controls)
     b = bernstein(t, n)
 
-    return b @ controls
+    return np.matmul(b, controls)
 
 
-def compute_curve(controls):
-    ts = np.linspace(0, 1, 100)
+def compute_curve(controls, n=100):
+    ts = np.linspace(0, 1, n)
     b = np.asarray([bernstein(t, len(controls)) for t in ts])
-    return b @ controls
+    return np.matmul(b, controls)
 
 
 class Bezier(nn.Module):
@@ -63,7 +63,7 @@ class Bezier(nn.Module):
         self.controls = nn.Parameter(data=controls)
 
     def forward(self):
-        return self.bernstein @ self.controls
+        return torch.matmul(self.bernstein, self.controls)
 
     def extrapolate(self, t0, t1):
         controls = self.controls.data.numpy()

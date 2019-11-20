@@ -1,0 +1,1 @@
+merganser_msgs/SkeletonMsg[] skeletons
