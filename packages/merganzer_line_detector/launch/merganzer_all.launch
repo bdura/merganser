@@ -28,4 +28,11 @@
         </include>
     </group>
 
+    <group>
+        <include file="$(find merganser_bezier)/launch/merganser_bezier_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="verbose" value="true" />
+        </include>
+    </group>
+
 </launch>

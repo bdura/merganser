@@ -3,13 +3,13 @@
 import duckietown_utils as dtu
 import rospy
 import numpy as np
-from merganser_bezier.utils.bezier import Bezier, BezierLoss
-from sensor_msgs.msg import BezierMsg, SkeletonMsg, SkeletonsMsg, BeziersMsg
+from merganser_bezier.bezier import Bezier, BezierLoss
+from merganser_msgs.msg import BezierMsg, SkeletonMsg, SkeletonsMsg, BeziersMsg
 
 
 class BezierNode(object):
     def __init__(self):
-        self.node_name = rospy.get_name()
+        self.node_name = 'BezierNode'
 
         # Parameters
         self.verbose = False
@@ -17,7 +17,7 @@ class BezierNode(object):
 
         # Subscribers
         self.sub_skeleton = rospy.Subscriber(
-            '~skeleton',
+            '~skeletons',
             SkeletonsMsg,
             self.process_skeletons,
             queue_size=1
@@ -35,6 +35,7 @@ class BezierNode(object):
         rospy.loginfo(message)
 
     def update_params(self, _event):
+        self.loginfo('Updating...')
         self.verbose = rospy.get_param('~verbose', False)
         self.refit = rospy.get_param('~refit', 1)
 
@@ -74,6 +75,6 @@ class BezierNode(object):
 
 if __name__ == '__main__':
     rospy.init_node('merganser_bezier_node', anonymous=False)
-    line_detector_node = BezierNode()
-    rospy.on_shutdown(line_detector_node.on_shutdown)
+    bezier_node = BezierNode()
+    rospy.on_shutdown(bezier_node.on_shutdown)
     rospy.spin()

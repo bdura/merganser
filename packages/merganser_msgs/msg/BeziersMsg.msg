@@ -1,1 +1,1 @@
-merganser_msg/Bezier[] beziers
+merganser_msgs/BezierMsg[] beziers

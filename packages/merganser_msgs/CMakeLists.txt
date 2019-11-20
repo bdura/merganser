@@ -1,12 +1,11 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(merganzer_line_detector)
+project(merganser_msgs)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   duckietown_msgs # Every duckietown packages should use this.
-  cv_bridge
-  # XXX add anti_instagram?
+  message_generation
 )
 
 add_message_files(
@@ -20,9 +19,8 @@ add_message_files(
 generate_messages(
    DEPENDENCIES
    std_msgs
+   duckietown_msgs
 )
-
-catkin_python_setup()
 
 catkin_package()
 

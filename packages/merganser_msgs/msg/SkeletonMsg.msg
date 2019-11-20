@@ -1,4 +1,4 @@
-merganser_msg/Vector2D[] cloud
+duckietown_msgs/Vector2D[] cloud
 
 uint8 WHITE=0
 uint8 YELLOW=1
