@@ -17,14 +17,15 @@ def detections_to_image(detections):
 
 def skeletons_to_image(skeletons, image_size):
     B, G, R = 0, 1, 2
+    step = 64
     image = np.zeros(image_size, dtype=np.uint8)
 
-    for x, y in skeletons.white:
-        image[x, y, :] = 255
-    for x, y in skeletons.yellow:
-        image[x, y, G] = 255
-        image[x, y, R] = 255
-    for x, y in skeletons.red:
-        image[x, y, R] = 255
+    for index, (x, y) in enumerate(skeletons.white):
+        image[x, y, :] = max(255 - index * step, 0)
+    for index, (x, y) in enumerate(skeletons.yellow):
+        image[x, y, G] = max(255 - index * step, 0)
+        image[x, y, R] = max(255 - index * step, 0)
+    for index, (x, y) in enumerate(skeletons.red):
+        image[x, y, R] = max(255 - index * step, 0)
 
     return image
