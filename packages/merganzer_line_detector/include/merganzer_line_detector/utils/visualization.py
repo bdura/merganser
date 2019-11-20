@@ -14,3 +14,17 @@ def detections_to_image(detections):
     image[..., R] = cv2.bitwise_or(image[..., R], detections.red)
 
     return image
+
+def skeletons_to_image(skeletons, image_size):
+    B, G, R = 0, 1, 2
+    image = np.zeros(image_size, dtype=np.uint8)
+
+    for x, y in skeletons.white:
+        image[x, y, :] = 255
+    for x, y in skeletons.yellow:
+        image[x, y, G] = 255
+        image[x, y, R] = 255
+    for x, y in skeletons.red:
+        image[x, y, R] = 255
+
+    return image

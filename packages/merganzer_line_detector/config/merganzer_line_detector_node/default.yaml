@@ -6,7 +6,6 @@ detector:
   - configuration:
       kernel_size: 3
       large_kernel_size: 11
-      prune_kernel_size: 5
 
       hsv_white1:  [  0,   0, 150]
       hsv_white2:  [180, 100, 255]

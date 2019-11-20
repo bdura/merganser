@@ -18,8 +18,7 @@ class LineDetectorHSV(dtu.Configurable):
             'hsv_red3', 'hsv_red4',
 
             'kernel_size',
-            'large_kernel_size',
-            'prune_kernel_size',
+            'large_kernel_size'
         ]
         super(LineDetectorHSV, self).__init__(params_names, configuration)
 
@@ -27,8 +26,6 @@ class LineDetectorHSV(dtu.Configurable):
             (self.kernel_size, self.kernel_size))
         self._large_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
             (self.large_kernel_size, self.large_kernel_size))
-        self._prune_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
-            (self.prune_kernel_size, self.prune_kernel_size))
 
     def color_filter(self, hsv_image):
         # The masks are eroded with a small kernel to remove their edges
@@ -54,15 +51,30 @@ class LineDetectorHSV(dtu.Configurable):
 
         return Detections(white=white_mask, yellow=yellow_mask, red=red_mask)
 
-    def prune_small_components(self, masks):
-        def _prune(mask):
-            return cv2.morphologyEx(mask, cv2.MORPH_OPEN, self._prune_kernel)
+    def get_connected_skeletons(self, skeletons, num_components, components):
+        x_white, y_white = np.nonzero(skeletons.white)
+        indices_white = [[] for _ in range(num_components)]
+        for index, (x, y) in enumerate(zip(x_white, y_white)):
+            indices_white[components[x, y]].append(index)
 
-        return Detections(white=_prune(masks.white),
-                          yellow=_prune(masks.yellow),
-                          red=_prune(masks.red))
+        x_yellow, y_yellow = np.nonzero(skeletons.yellow)
+        indices_yellow = [[] for _ in range(num_components)]
+        for index, (x, y) in enumerate(zip(x_yellow, y_yellow)):
+            indices_yellow[components[x, y]].append(index)
 
-    def get_skeleton(self, masks):
+        x_red, y_red = np.nonzero(skeletons.red)
+        indices_red = [[] for _ in range(num_components)]
+        for index, (x, y) in enumerate(zip(x_red, y_red)):
+            indices_red[components[x, y]].append(index)
+
+        return Detections(white=[(x_white[indices], y_white[indices])
+                            for indices in indices_white if indices],
+                          yellow=[(x_yellow[indices], y_yellow[indices])
+                            for indices in indices_yellow if indices],
+                          red=[(x_red[indices], y_red[indices])
+                            for indices in indices_red if indices])
+
+    def get_skeletons(self, masks):
         # Combine all the masks into a single binary image
         binary_image = cv2.bitwise_or(masks.white, masks.yellow)
         binary_image = cv2.bitwise_or(binary_image, masks.red)
@@ -70,18 +82,27 @@ class LineDetectorHSV(dtu.Configurable):
         # Get the skeleton, based on [Lee94]
         skeleton = skeletonize_3d(binary_image)
 
-        return Detections(white=cv2.bitwise_and(skeleton, masks.white),
-                          yellow=cv2.bitwise_and(skeleton, masks.yellow),
-                          red=cv2.bitwise_and(skeleton, masks.red))
+        # Get dilated version of the skeleton to find the connected components.
+        # This is to perform a poor man's version of DBSCAN.
+        neighbors = cv2.dilate(skeleton, self._large_kernel, iterations=1)
+        # Get the connected components
+        num_components, components = cv2.connectedComponents(neighbors,
+                                                             connectivity=4)
+
+        skeletons = Detections(white=cv2.bitwise_and(skeleton, masks.white),
+                               yellow=cv2.bitwise_and(skeleton, masks.yellow),
+                               red=cv2.bitwise_and(skeleton, masks.red))
+
+        return self.get_connected_skeletons(skeletons,
+                                            num_components,
+                                            components)
 
     def detect_lines(self, bgr_image):
         # Convert the BGR image to HSV
         hsv_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
         # Filter the colors
         color_masks = self.color_filter(hsv_image)
-        # Prune the small components
-        color_masks = self.prune_small_components(color_masks)
         # Get the skeletons
-        skeletons = self.get_skeleton(color_masks)
+        skeletons = self.get_skeletons(color_masks)
 
         return skeletons, color_masks
