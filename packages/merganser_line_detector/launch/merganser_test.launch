@@ -20,9 +20,9 @@
     </include>
 
     <group>
-        <remap from="merganzer_line_detector_node/corrected_image/compressed" to="anti_instagram_node/corrected_image/compressed"/>
+        <remap from="merganser_line_detector_node/corrected_image/compressed" to="anti_instagram_node/corrected_image/compressed"/>
 
-        <include file="$(find merganzer_line_detector)/launch/merganzer_line_detector_node.launch">
+        <include file="$(find merganser_line_detector)/launch/merganser_line_detector_node.launch">
             <arg name="veh" value="$(arg veh)"/>
             <arg name="verbose" value="$(arg verbose)" />
         </include>

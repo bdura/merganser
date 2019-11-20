@@ -2,7 +2,7 @@ img_size: [120,160]
 top_cutoff: 40
 
 detector:
-  - merganzer_line_detector.LineDetectorHSV
+  - merganser_line_detector.LineDetectorHSV
   - configuration:
       kernel_size: 3
       large_kernel_size: 11
