@@ -3,6 +3,7 @@ import torch
 from scipy.special import comb
 from torch import nn
 from torch.optim import Adam
+from copy import deepcopy
 
 
 def bernstein(t, n):
@@ -77,6 +78,10 @@ class Bezier(nn.Module):
             loss = loss_function(self(), cloud)
             loss.backward()
             optimiser.step()
+
+    def copy(self):
+        new = deepcopy(self)
+        return new
 
 
 class BezierLoss(object):

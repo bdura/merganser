@@ -1,0 +1,14 @@
+<launch>
+    <arg name="veh" default="$(env VEHICLE_NAME)"/>
+    <arg name="ai_trafo_mode" default="cb" doc="'cb' for colo balance only; 'both' for color balance and linear trafo"/>
+    <arg name="ai_interval" default="5" doc="interval with which the linear trafo gets updated. color balance is performed every second."/>
+    <arg name="verbose" default="false"/>
+
+    <group>
+        <include file="$(find merganser_bezier)/launch/merganser_bezier_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="verbose" value="true" />
+        </include>
+    </group>
+
+</launch>

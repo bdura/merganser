@@ -1,4 +1,3 @@
 # LIST YOUR PYTHON PACKAGES HERE
 
 scikit-image>=0.14.5
-torch
