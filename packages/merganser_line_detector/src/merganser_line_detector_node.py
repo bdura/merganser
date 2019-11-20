@@ -8,7 +8,7 @@ from cv_bridge import CvBridge
 from duckietown_msgs.msg import BoolStamped, SegmentList
 from sensor_msgs.msg import CompressedImage, Image
 
-from merganzer_line_detector.utils import detections_to_image, skeletons_to_image
+from merganser_line_detector.utils import detections_to_image, skeletons_to_image
 
 
 class LineDetectorNode(object):
@@ -92,7 +92,7 @@ class LineDetectorNode(object):
 
 
 if __name__ == '__main__':
-    rospy.init_node('merganzer_line_detector_node', anonymous=False)
+    rospy.init_node('merganser_line_detector_node', anonymous=False)
     line_detector_node = LineDetectorNode()
     rospy.on_shutdown(line_detector_node.on_shutdown)
     rospy.spin()
