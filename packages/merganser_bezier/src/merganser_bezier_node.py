@@ -3,8 +3,10 @@
 import duckietown_utils as dtu
 import rospy
 import numpy as np
-from merganser_bezier.bezier import Bezier, BezierLoss
+import torch
+from merganser_bezier.bezier import Bezier, BezierLoss, compute_curve
 from merganser_msgs.msg import BezierMsg, SkeletonMsg, SkeletonsMsg, BeziersMsg
+from duckietown_msgs.msg import Vector2D
 
 
 class BezierNode(object):
@@ -32,7 +34,7 @@ class BezierNode(object):
         rospy.Timer(rospy.Duration.from_sec(2.), self.update_params)
 
     def loginfo(self, message):
-        rospy.loginfo(message)
+        rospy.loginfo('[%s] %s' % (self.node_name, message))
 
     def update_params(self, _event):
         self.loginfo('Updating...')
@@ -40,11 +42,16 @@ class BezierNode(object):
         self.refit = rospy.get_param('~refit', 1)
 
     def _process_skeleton(self, skeleton):
-        cloud = np.array([[point.x, point.y] for point in skeleton.cloud])
+
+        self.loginfo('Getting cloud')
+
+        cloud = torch.Tensor([[point.x, point.y] for point in skeleton.cloud])
         color = skeleton.color
 
         bezier = Bezier(4, 20, cloud)
         loss_function = BezierLoss(1e-2)
+
+        self.loginfo('Loss pre-fit : %.2f' % loss_function(bezier(), cloud))
 
         bezier.fit(
             cloud=cloud,
@@ -52,7 +59,9 @@ class BezierNode(object):
             steps=20
         )
 
-        b = BeziersMsg()
+        self.loginfo('Loss post-fit : %.2f' % loss_function(bezier(), cloud))
+
+        b = BezierMsg()
         b.color = color
         for i, c in enumerate(bezier.controls.data.numpy()):
             b.controls[i].x = c[0]
@@ -62,12 +71,12 @@ class BezierNode(object):
 
     def process_skeletons(self, skeletons_msg):
         skeletons = skeletons_msg.skeletons
-        beziers_msg = BeziersMsg()
+        beziers = BeziersMsg()
 
         for skeleton in skeletons:
-            beziers_msg.beziers.append(self._process_skeleton(skeleton))
+            beziers.beziers.append(self._process_skeleton(skeleton))
 
-        self.pub_bezier(beziers_msg)
+        self.pub_bezier.publish(beziers)
 
     def on_shutdown(self):
         self.loginfo('Shutdown...')
