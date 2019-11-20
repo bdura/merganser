@@ -16,6 +16,7 @@ class BezierNode(object):
         # Parameters
         self.verbose = False
         self.refit = 15
+        self.test = False
 
         # Subscribers
         self.sub_skeleton = rospy.Subscriber(
@@ -28,10 +29,38 @@ class BezierNode(object):
 
         # Publishers
         self.pub_bezier = rospy.Publisher('~beziers', BeziersMsg, queue_size=1)
+        self.pub_skeletons = rospy.Publisher('~skeletons', SkeletonsMsg, queue_size=1)
 
         self.update_params(None)
 
         rospy.Timer(rospy.Duration.from_sec(2.), self.update_params)
+
+        if self.test:
+            rospy.Timer(rospy.Duration.from_sec(2.), self.test_messages)
+
+    def test_messages(self, event=None):
+        controls = np.array([
+            [0, 1],
+            [1, 0],
+            [2, 3],
+            [3, 0],
+        ])
+
+        curve = compute_curve(controls)
+        cloud = np.random.normal(size=curve.shape) * .1 + curve
+
+        skeleton = SkeletonMsg()
+        skeleton.color = skeleton.WHITE
+
+        for i, (x, y) in enumerate(cloud):
+            v = Vector2D()
+            v.x, v.y = x, y
+            skeleton.cloud.append(v)
+
+        skeletons = SkeletonsMsg()
+        skeletons.skeletons.append(skeleton)
+
+        self.pub_skeletons.publish(skeletons)
 
     def loginfo(self, message):
         rospy.loginfo('[%s] %s' % (self.node_name, message))
@@ -39,7 +68,7 @@ class BezierNode(object):
     def update_params(self, _event):
         self.loginfo('Updating...')
         self.verbose = rospy.get_param('~verbose', False)
-        self.refit = rospy.get_param('~refit', 1)
+        self.test = rospy.get_param('~test', False)
 
     def _process_skeleton(self, skeleton):
 
