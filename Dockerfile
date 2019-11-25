@@ -29,6 +29,8 @@ RUN apt-get update \
     $(awk -F: '/^[^#]/ { print $1 }' dependencies-apt.txt | uniq) \
   && rm -rf /var/lib/apt/lists/*
 
+RUN pip install autograd scikit-image>=0.14.5
+
 # install python dependencies
 RUN pip install -r ${REPO_PATH}/dependencies-py.txt
 

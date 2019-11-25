@@ -1,4 +1,1 @@
 # LIST YOUR PYTHON PACKAGES HERE
-
-autograd
-scikit-image>=0.14.5
