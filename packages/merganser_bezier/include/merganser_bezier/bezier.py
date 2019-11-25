@@ -49,7 +49,7 @@ class Bezier(object):
         ts = np.linspace(0, 1, precision)
         self.bernstein = np.array([bernstein(t, order) for t in ts])
 
-        if choice is None:
+        if choice is None or len(choice) < order:
             controls = np.random.normal(size=(order, 2))
         else:
             permutation = np.arange(choice.shape[0], dtype='uint')

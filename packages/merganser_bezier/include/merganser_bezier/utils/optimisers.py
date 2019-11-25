@@ -73,6 +73,6 @@ def adam(grad, x, callback=None, num_iters=100,
         x = x - step_size*mhat/(np.sqrt(vhat) + eps)
 
         if np.linalg.norm(g) < threshold:
-            print('Stopped after %s steps.' % (i + 1,))
+            # print('Stopped after %s steps.' % (i + 1,))
             return x
     return x

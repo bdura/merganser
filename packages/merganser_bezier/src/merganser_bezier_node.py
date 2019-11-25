@@ -54,8 +54,8 @@ class BezierNode(object):
         self.n = 0
 
         # if self.test:
-        self.pub_skeletons = rospy.Publisher('~skeletons', SkeletonsMsg, queue_size=1)
-        self.skeletons_timer = rospy.Timer(rospy.Duration.from_sec(.01), self.test_messages)
+        # self.pub_skeletons = rospy.Publisher('~skeletons', SkeletonsMsg, queue_size=1)
+        # self.skeletons_timer = rospy.Timer(rospy.Duration.from_sec(.01), self.test_messages)
 
     def update_params(self, _event):
         # self.loginfo('Updating parameters...')
