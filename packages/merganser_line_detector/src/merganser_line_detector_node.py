@@ -33,6 +33,7 @@ class LineDetectorNode(object):
         # Publishers
         self.pub_skeletons_image = None
         self.pub_masks_image = None
+        self.pub_road_mask_image = None
         self.pub_skeletons = rospy.Publisher('~skeletons',
                                              SkeletonsMsg,
                                              queue_size=1)
@@ -61,6 +62,9 @@ class LineDetectorNode(object):
             self.pub_masks_image = rospy.Publisher('~masks_image',
                                              Image,
                                              queue_size=1)
+            self.pub_road_mask_image = rospy.Publisher('~road_mask_image',
+                                                       Image,
+                                                       queue_size=1)
         self.verbose = verbose
 
     def process_image(self, image_msg):
@@ -79,7 +83,7 @@ class LineDetectorNode(object):
 
         image_cv = image_cv[self.top_cutoff:]
 
-        skeletons, masks = self.detector.detect_lines(image_cv)
+        skeletons, debug = self.detector.detect_lines(image_cv)
 
         # Create the message and publish
         skeletons_msg = skeletons_to_msg(skeletons,
@@ -88,6 +92,8 @@ class LineDetectorNode(object):
         self.pub_skeletons.publish(skeletons_msg)
 
         if self.verbose:
+            masks, road_mask = debug
+
             skeletons_image = skeletons_to_image(skeletons, image_cv.shape)
             skeletons_msg = self.bridge.cv2_to_imgmsg(skeletons_image, 'bgr8')
             skeletons_msg.header.stamp = image_msg.header.stamp
@@ -97,6 +103,11 @@ class LineDetectorNode(object):
             masks_msg = self.bridge.cv2_to_imgmsg(masks_image, 'bgr8')
             masks_msg.header.stamp = image_msg.header.stamp
             self.pub_masks_image.publish(masks_msg)
+
+            road_mask_image = cv2.cvtColor(road_mask, cv2.COLOR_GRAY2BGR)
+            road_mask_msg = self.bridge.cv2_to_imgmsg(road_mask_image, 'bgr8')
+            road_mask_msg.header.stamp = image_msg.header.stamp
+            self.pub_road_mask_image.publish(road_mask_msg)
 
     def on_shutdown(self):
         self.loginfo('Shutdown...')
