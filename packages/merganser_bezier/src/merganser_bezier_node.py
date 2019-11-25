@@ -3,20 +3,35 @@
 import duckietown_utils as dtu
 import rospy
 import numpy as np
-import torch
-from merganser_bezier.bezier import Bezier, BezierLoss, compute_curve
+import time
+from merganser_bezier.bezier import Bezier, compute_curve
+from merganser_bezier.utils.plots import plot_fitted_skeleton
 from merganser_msgs.msg import BezierMsg, SkeletonMsg, SkeletonsMsg, BeziersMsg
 from duckietown_msgs.msg import Vector2D
+
+from cv_bridge import CvBridge
+from sensor_msgs.msg import Image
 
 
 class BezierNode(object):
     def __init__(self):
         self.node_name = 'BezierNode'
 
+        self.stats = Stats()
+
+        self.intermittent_interval = 100
+        self.intermittent_counter = 0
+
         # Parameters
         self.verbose = False
-        self.refit = 15
-        self.test = False
+        self.refit_every = 1
+        self.loss_threshold = .1
+        self.reg = 5e-3
+        self.lr = .1
+        self.extension = .1
+        self.curve_precision = 20
+        self.fitting_steps = 20
+        self.eps = 1e-3
 
         # Subscribers
         self.sub_skeleton = rospy.Subscriber(
@@ -25,25 +40,51 @@ class BezierNode(object):
             self.process_skeletons,
             queue_size=1
         )
-        self.steps = 0
 
         # Publishers
         self.pub_bezier = rospy.Publisher('~beziers', BeziersMsg, queue_size=1)
-        self.pub_skeletons = rospy.Publisher('~skeletons', SkeletonsMsg, queue_size=1)
 
         self.update_params(None)
 
+        # Updates the parameters every 2 seconds
         rospy.Timer(rospy.Duration.from_sec(2.), self.update_params)
 
-        if self.test:
-            rospy.Timer(rospy.Duration.from_sec(2.), self.test_messages)
+        # Attributes
+        self.steps = 0
+        self.beziers = []
+
+        self.time = 0
+        self.n = 0
+
+        self.bridge = CvBridge()
+        self.pub_skeletons_image = rospy.Publisher('~curves', Image, queue_size=1)
+
+    def update_params(self, _event):
+        self.verbose = rospy.get_param('~verbose', False)
+
+        self.refit_every = rospy.get_param('~refit_every', 1)
+        self.intermittent_interval = rospy.get_param('~intermittent_interval', 10)
+
+        self.loss_threshold = rospy.get_param('~loss_threshold', 1e-3)
+
+        self.extension = rospy.get_param('~extension', 1e-2)
+
+        self.curve_precision = rospy.get_param('~curve_precision', 15)
+        self.fitting_steps = rospy.get_param('~fitting_steps', 200)
+
+        self.eps = rospy.get_param('~eps', 1e-3)
+        self.lr = rospy.get_param('~lr', 1e-2)
+        self.reg = rospy.get_param('~reg', 1e-2)
 
     def test_messages(self, event=None):
+
+        skeletons = SkeletonsMsg()
+
         controls = np.array([
-            [0, 1],
-            [1, 0],
-            [2, 3],
-            [3, 0],
+            [.2, .4],
+            [.4, .2],
+            [.6, .8],
+            [.8, .2],
         ])
 
         curve = compute_curve(controls)
@@ -57,7 +98,26 @@ class BezierNode(object):
             v.x, v.y = x, y
             skeleton.cloud.append(v)
 
-        skeletons = SkeletonsMsg()
+        skeletons.skeletons.append(skeleton)
+
+        controls = np.array([
+            [.4, .2],
+            [.2, .4],
+            [.8, .6],
+            [.2, .8],
+        ])
+
+        curve = compute_curve(controls)
+        cloud = np.random.normal(size=curve.shape) * .1 + curve
+
+        skeleton = SkeletonMsg()
+        skeleton.color = skeleton.WHITE
+
+        for i, (x, y) in enumerate(cloud):
+            v = Vector2D()
+            v.x, v.y = x, y
+            skeleton.cloud.append(v)
+
         skeletons.skeletons.append(skeleton)
 
         self.pub_skeletons.publish(skeletons)
@@ -65,50 +125,160 @@ class BezierNode(object):
     def loginfo(self, message):
         rospy.loginfo('[%s] %s' % (self.node_name, message))
 
-    def update_params(self, _event):
-        self.loginfo('Updating...')
-        self.verbose = rospy.get_param('~verbose', False)
-        self.test = rospy.get_param('~test', False)
+    def _extend_beziers(self):
+        for bezier in self.beziers:
+            bezier.extrapolate(0 - self.extension, 1 + self.extension)
+
+    def _extract_skeleton(self, skeleton):
+        cloud = np.array([[point.x, point.y] for point in skeleton.cloud])
+        color = skeleton.color
+
+        return cloud, color
 
     def _process_skeleton(self, skeleton):
 
-        self.loginfo('Getting cloud')
+        cloud, color = self._extract_skeleton(skeleton)
 
-        cloud = torch.Tensor([[point.x, point.y] for point in skeleton.cloud])
-        color = skeleton.color
+        losses = np.array([b.loss(cloud) for b in self.beziers])
+        argmin = losses.argmin() if len(losses) > 0 else -1
 
-        bezier = Bezier(4, 20, cloud)
-        loss_function = BezierLoss(1e-2)
-
-        self.loginfo('Loss pre-fit : %.2f' % loss_function(bezier(), cloud))
+        if argmin > -1 and losses[argmin] < self.loss_threshold:
+            bezier = self.beziers[argmin].copy()
+        else:
+            bezier = Bezier(4, self.curve_precision, choice=cloud, reg=self.reg)
 
         bezier.fit(
             cloud=cloud,
-            loss_function=loss_function,
-            steps=20
+            steps=self.fitting_steps,
+            eps=self.eps,
+            lr=self.lr,
         )
 
-        self.loginfo('Loss post-fit : %.2f' % loss_function(bezier(), cloud))
+        return bezier, color
 
-        b = BezierMsg()
-        b.color = color
-        for i, c in enumerate(bezier.controls.data.numpy()):
-            b.controls[i].x = c[0]
-            b.controls[i].y = c[1]
-
-        return b
+    def _make_bezier_message(self, bezier, color):
+        msg = BezierMsg()
+        msg.color = color
+        for i, c in enumerate(bezier.controls):
+            msg.controls[i].x = c[0]
+            msg.controls[i].y = c[1]
+        return msg
 
     def process_skeletons(self, skeletons_msg):
+
+        # self.loginfo('Got skeletons')
+
+        t0 = time.time()
+
+        self.stats.received()
+
+        # Extends all collected Bezier curves
+        self._extend_beziers()
+
+        # Gets the skeletons
         skeletons = skeletons_msg.skeletons
-        beziers = BeziersMsg()
+
+        # Creates the message containing the updated Bezier curves
+        beziers = []
+        messages = BeziersMsg()
+
+        # Removes scattered skeletons
+        skeletons = [skeleton for skeleton in skeletons if len(skeleton.cloud) > 10]
 
         for skeleton in skeletons:
-            beziers.beziers.append(self._process_skeleton(skeleton))
 
-        self.pub_bezier.publish(beziers)
+            bezier, color = self._process_skeleton(skeleton)
+            beziers.append(bezier)
+
+            # Creates the message associated with the bezier curve and appends it to the general message
+            msg = self._make_bezier_message(bezier, color)
+            messages.beziers.append(msg)
+
+        self.beziers = beziers
+
+        if self.verbose and self.intermittent_log_now():
+            img = plot_fitted_skeleton(beziers, skeletons)
+            img_message = self.bridge.cv2_to_imgmsg(img, 'bgr8')
+
+            self.pub_skeletons_image.publish(img_message)
+
+        self.stats.processed()
+        self.intermittent_counter += 1
+        if self.intermittent_log_now():
+            self.intermittent_log(self.stats.info())
+            self.stats.reset()
+
+        self.pub_bezier.publish(messages)
+
+        t = time.time() - t0
+
+        self.time = self.time * .95 + t * .05
+
+    def intermittent_log_now(self):
+        return self.intermittent_counter % self.intermittent_interval == 1
+
+    def intermittent_log(self, s):
+        if not self.intermittent_log_now():
+            return
+        self.loginfo('%3d:%s' % (self.intermittent_counter, s))
+        self.loginfo('Mean process time : %.2f ms.' % (self.time * 1000))
+
+        self.loginfo('verbose %s' % (self.verbose,))
+        self.loginfo('refit_every %s' % (self.refit_every,))
+        self.loginfo('loss_threshold %s' % (self.loss_threshold,))
+        self.loginfo('reg %s' % (self.reg,))
+        self.loginfo('lr %s' % (self.lr,))
+        self.loginfo('extension %s' % (self.extension,))
+        self.loginfo('curve_precision %s' % (self.curve_precision,))
+        self.loginfo('fitting_steps %s' % (self.fitting_steps,))
+        self.loginfo('eps %s' % (self.eps,))
 
     def on_shutdown(self):
         self.loginfo('Shutdown...')
+
+
+class Stats():
+    def __init__(self):
+        self.nresets = 0
+        self.reset()
+
+    def reset(self):
+        self.nresets += 1
+        self.t0 = time.time()
+        self.nreceived = 0
+        self.nskipped = 0
+        self.nprocessed = 0
+
+    def received(self):
+        if self.nreceived == 0 and self.nresets == 1:
+            rospy.loginfo('line_detector_node received first image.')
+        self.nreceived += 1
+
+    def skipped(self):
+        self.nskipped += 1
+
+    def processed(self):
+        if self.nprocessed == 0 and self.nresets == 1:
+            rospy.loginfo('line_detector_node processing first image.')
+
+        self.nprocessed += 1
+
+    def info(self):
+        delta = time.time() - self.t0
+
+        if self.nreceived:
+            skipped_perc = (100.0 * self.nskipped / self.nreceived)
+        else:
+            skipped_perc = 0
+
+        def fps(x):
+            return '%.1f fps' % (x / delta)
+
+        m = ('In the last %.1f s: received %d (%s) processed %d (%s) skipped %d (%s) (%1.f%%)' %
+             (delta, self.nreceived, fps(self.nreceived),
+              self.nprocessed, fps(self.nprocessed),
+              self.nskipped, fps(self.nskipped), skipped_perc))
+        return m
 
 
 if __name__ == '__main__':

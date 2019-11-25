@@ -1,8 +1,9 @@
-import numpy as np
-import torch
+from copy import deepcopy
+
+import autograd.numpy as np
+from autograd import grad
+from .utils.optimisers import adam
 from scipy.special import comb
-from torch import nn
-from torch.optim import Adam
 
 
 def bernstein(t, n):
@@ -40,95 +41,62 @@ def compute_curve(controls, n=100):
     return np.matmul(b, controls)
 
 
-class Bezier(nn.Module):
+class Bezier(object):
 
-    def __init__(self, order, precision, choice=None):
+    def __init__(self, order, precision, reg=5e-3, choice=None):
         super(Bezier, self).__init__()
 
         ts = np.linspace(0, 1, precision)
+        self.bernstein = np.array([bernstein(t, order) for t in ts])
 
-        self.bernstein = torch.Tensor([bernstein(t, order) for t in ts])
-
-        if choice is None:
-            controls = torch.randn((order, 2))
+        if choice is None or len(choice) < order:
+            controls = np.random.normal(size=(order, 2))
         else:
-            choice = torch.Tensor(choice)
-            permutation = torch.randperm(choice.size(0))
+            permutation = np.arange(choice.shape[0], dtype='uint')
+            np.random.shuffle(permutation)
+
             indices = permutation[:order]
 
             controls = choice[indices]
 
-            arg = controls[:, 0].argsort()
+            arg = controls[:, 1].argsort()
             controls = controls[arg]
-        self.controls = nn.Parameter(data=controls)
+        self.controls = controls
 
-    def forward(self):
-        return torch.matmul(self.bernstein, self.controls)
+        self.cloud = None
+        self.reg = reg
+
+    def __call__(self):
+        return np.matmul(self.bernstein, self.controls)
+
+    def objective(self, params, cloud):
+        curve = np.matmul(self.bernstein, params)
+        diff = curve.reshape(-1, 1, 2) - cloud.reshape(1, -1, 2)
+        se = (diff ** 2).mean(axis=2)
+
+        return se.min(axis=0).mean() + self.reg * se.min(axis=1).mean()
+
+    def create_objective(self, cloud):
+
+        def obj(params, *args):
+            return self.objective(params, cloud)
+
+        return obj
+
+    def loss(self, cloud):
+        return self.objective(self.controls, cloud)
 
     def extrapolate(self, t0, t1):
-        controls = self.controls.data.numpy()
-        self.controls.data = torch.Tensor(extrapolate(controls, t0, t1))
+        self.controls = extrapolate(self.controls, t0, t1)
 
-    def fit(self, cloud, loss_function, steps=20):
-        optimiser = Adam(self.parameters(), lr=.1)
+    def fit(self, cloud, steps=20, lr=.1, eps=1e-3):
+        objective = self.create_objective(cloud)
+        gradient = grad(objective)
+        self.controls = adam(gradient, self.controls, step_size=lr, num_iters=steps, threshold=eps)
 
-        for s in range(steps):
-            self.zero_grad()
-            loss = loss_function(self(), cloud)
-            loss.backward()
-            optimiser.step()
-
-
-class BezierLoss(object):
-
-    def __init__(self, alpha=1e-3):
-        """
-        Initialises the object.
-
-        Parameters
-        ----------
-        alpha: float
-            Governs the regularisation on the extreme points.
-            With `alpha = 0`, the curve can be longer than necessary and have irrelevant extremities.
-        """
-
-        self.alpha = alpha
-
-    def __call__(self, curve, cloud):
-        r"""
-        Computes the "_Bezier loss_" between a Bezier curve and a cloud of points to be fitted.
-
-        The computed loss is :
-        .. math::
-
-            \mathcal{L}(B, C) = \frac{1}{|C|} \sum_{c \in C} \min_{b \in B} ||c - b||^2
-
-        We add a regularization term to make sure that the computed curve
-        is not longer than necessary (which could lead to incorrect deductions),
-        by penalising the distance between the extremities of the curve and the cloud.
-
-        Parameters
-        ----------
-        curve: torch.Tensor
-            The Bezier curve to evaluate.
-        cloud: torch.Tensor
-            The cloud of points to be fitted.
-
-        Returns
-        -------
-        loss: torch.Tensor
-            The goodness-of-fit loss between the curve and the point cloud.
-        """
-
-        curve = curve.unsqueeze(0)
-        cloud = cloud.unsqueeze(1)
-
-        se = ((curve - cloud) ** 2).mean(dim=-1)
-        loss = se.min(dim=1)[0].mean()
-
-        loss = loss + self.alpha * se[:, [0, -1]].min(dim=0)[0].mean()
-
-        return loss
+    def copy(self):
+        new = deepcopy(self)
+        return new
 
 
 def de_casteljau(controls, t, left=None, right=None):
