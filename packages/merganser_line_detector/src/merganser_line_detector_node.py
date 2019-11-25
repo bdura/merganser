@@ -92,14 +92,14 @@ class LineDetectorNode(object):
         self.pub_skeletons.publish(skeletons_msg)
 
         if self.verbose:
-            masks, road_mask = debug
+            raw_masks, filtered_masks, road_mask = debug
 
             skeletons_image = skeletons_to_image(skeletons, image_cv.shape)
             skeletons_msg = self.bridge.cv2_to_imgmsg(skeletons_image, 'bgr8')
             skeletons_msg.header.stamp = image_msg.header.stamp
             self.pub_skeletons_image.publish(skeletons_msg)
 
-            masks_image = detections_to_image(masks)
+            masks_image = detections_to_image(filtered_masks)
             masks_msg = self.bridge.cv2_to_imgmsg(masks_image, 'bgr8')
             masks_msg.header.stamp = image_msg.header.stamp
             self.pub_masks_image.publish(masks_msg)
