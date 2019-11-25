@@ -4,10 +4,13 @@ import duckietown_utils as dtu
 import rospy
 import numpy as np
 import time
-from gc import collect
 from merganser_bezier.bezier import Bezier, compute_curve
+from merganser_bezier.utils.plots import plot_fitted_skeleton
 from merganser_msgs.msg import BezierMsg, SkeletonMsg, SkeletonsMsg, BeziersMsg
 from duckietown_msgs.msg import Vector2D
+
+from cv_bridge import CvBridge
+from sensor_msgs.msg import Image
 
 
 class BezierNode(object):
@@ -15,16 +18,16 @@ class BezierNode(object):
         self.node_name = 'BezierNode'
 
         self.stats = Stats()
-        # Only be verbose every 10 cycles
-        self.intermittent_interval = 10
+
+        self.intermittent_interval = 100
         self.intermittent_counter = 0
 
         # Parameters
         self.verbose = False
         self.refit_every = 1
-        self.test = True
         self.loss_threshold = .1
         self.reg = 5e-3
+        self.lr = .1
         self.extension = .1
         self.curve_precision = 20
         self.fitting_steps = 20
@@ -53,29 +56,25 @@ class BezierNode(object):
         self.time = 0
         self.n = 0
 
-        # if self.test:
-        # self.pub_skeletons = rospy.Publisher('~skeletons', SkeletonsMsg, queue_size=1)
-        # self.skeletons_timer = rospy.Timer(rospy.Duration.from_sec(.01), self.test_messages)
+        self.bridge = CvBridge()
+        self.pub_skeletons_image = rospy.Publisher('~curves', Image, queue_size=1)
 
     def update_params(self, _event):
-        # self.loginfo('Updating parameters...')
-
-        self.test = rospy.get_param('~test', False)
-
         self.verbose = rospy.get_param('~verbose', False)
-        self.refit_every = rospy.get_param('~refit_every', 1)
-        self.loss_threshold = rospy.get_param('~loss_threshold', .01)
-        self.extension = rospy.get_param('~extension', .1)
-        self.curve_precision = rospy.get_param('~curve_precision', 100)
-        self.fitting_steps = rospy.get_param('~fitting_steps', 20)
-        self.eps = rospy.get_param('~eps', 1e-2)
 
-        # if self.test:
-        #     self.pub_skeletons = rospy.Publisher('~skeletons', SkeletonsMsg, queue_size=1)
-        #     self.skeletons_timer = rospy.Timer(rospy.Duration.from_sec(.1), self.test_messages)
-        # else:
-        #     self.pub_skeletons = None
-        #     self.skeletons_timer = None
+        self.refit_every = rospy.get_param('~refit_every', 1)
+        self.intermittent_interval = rospy.get_param('~intermittent_interval', 10)
+
+        self.loss_threshold = rospy.get_param('~loss_threshold', 1e-3)
+
+        self.extension = rospy.get_param('~extension', 1e-2)
+
+        self.curve_precision = rospy.get_param('~curve_precision', 15)
+        self.fitting_steps = rospy.get_param('~fitting_steps', 200)
+
+        self.eps = rospy.get_param('~eps', 1e-3)
+        self.lr = rospy.get_param('~lr', 1e-2)
+        self.reg = rospy.get_param('~reg', 1e-2)
 
     def test_messages(self, event=None):
 
@@ -152,6 +151,7 @@ class BezierNode(object):
             cloud=cloud,
             steps=self.fitting_steps,
             eps=self.eps,
+            lr=self.lr,
         )
 
         return bezier, color
@@ -182,7 +182,11 @@ class BezierNode(object):
         beziers = []
         messages = BeziersMsg()
 
+        # Removes scattered skeletons
+        skeletons = [skeleton for skeleton in skeletons if len(skeleton.cloud) > 10]
+
         for skeleton in skeletons:
+
             bezier, color = self._process_skeleton(skeleton)
             beziers.append(bezier)
 
@@ -191,6 +195,12 @@ class BezierNode(object):
             messages.beziers.append(msg)
 
         self.beziers = beziers
+
+        if self.verbose and self.intermittent_log_now():
+            img = plot_fitted_skeleton(beziers, skeletons)
+            img_message = self.bridge.cv2_to_imgmsg(img, 'bgr8')
+
+            self.pub_skeletons_image.publish(img_message)
 
         self.stats.processed()
         self.intermittent_counter += 1
@@ -212,6 +222,16 @@ class BezierNode(object):
             return
         self.loginfo('%3d:%s' % (self.intermittent_counter, s))
         self.loginfo('Mean process time : %.2f ms.' % (self.time * 1000))
+
+        self.loginfo('verbose %s' % (self.verbose,))
+        self.loginfo('refit_every %s' % (self.refit_every,))
+        self.loginfo('loss_threshold %s' % (self.loss_threshold,))
+        self.loginfo('reg %s' % (self.reg,))
+        self.loginfo('lr %s' % (self.lr,))
+        self.loginfo('extension %s' % (self.extension,))
+        self.loginfo('curve_precision %s' % (self.curve_precision,))
+        self.loginfo('fitting_steps %s' % (self.fitting_steps,))
+        self.loginfo('eps %s' % (self.eps,))
 
     def on_shutdown(self):
         self.loginfo('Shutdown...')

@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import autograd.numpy as np
 from autograd import grad
-from utils.optimisers import adam
+from .utils.optimisers import adam
 from scipy.special import comb
 
 
@@ -59,7 +59,7 @@ class Bezier(object):
 
             controls = choice[indices]
 
-            arg = controls[:, 0].argsort()
+            arg = controls[:, 1].argsort()
             controls = controls[arg]
         self.controls = controls
 
@@ -74,7 +74,7 @@ class Bezier(object):
         diff = curve.reshape(-1, 1, 2) - cloud.reshape(1, -1, 2)
         se = (diff ** 2).mean(axis=2)
 
-        return se.min(axis=0).mean() + self.reg * se[[0, -1]].min(axis=1).mean()
+        return se.min(axis=0).mean() + self.reg * se.min(axis=1).mean()
 
     def create_objective(self, cloud):
 
