@@ -7,8 +7,10 @@ import duckietown_utils as dtu
 from cv_bridge import CvBridge
 from duckietown_msgs.msg import BoolStamped, SegmentList
 from sensor_msgs.msg import CompressedImage, Image
+from merganser_msgs.msg import SkeletonsMsg
 
-from merganser_line_detector.utils import detections_to_image, skeletons_to_image
+from merganser_line_detector.utils import (detections_to_image,
+    skeletons_to_image, skeletons_to_msg)
 
 
 class LineDetectorNode(object):
@@ -29,8 +31,11 @@ class LineDetectorNode(object):
                                           queue_size=1)
 
         # Publishers
-        self.pub_skeletons = None
-        self.pub_masks = None
+        self.pub_skeletons_image = None
+        self.pub_masks_image = None
+        self.pub_skeletons = rospy.Publisher('~skeletons',
+                                             SkeletonsMsg,
+                                             queue_size=1)
 
         self.update_params(None)
 
@@ -49,11 +54,11 @@ class LineDetectorNode(object):
             self.detector = dtu.instantiate_utils.instantiate(
                 package_name, class_name)
 
-        if verbose and (self.pub_skeletons is None):
-            self.pub_skeletons = rospy.Publisher('~skeletons',
+        if verbose and (self.pub_skeletons_image is None):
+            self.pub_skeletons_image = rospy.Publisher('~skeletons_image',
                                                  Image,
                                                  queue_size=1)
-            self.pub_masks = rospy.Publisher('~masks',
+            self.pub_masks_image = rospy.Publisher('~masks_image',
                                              Image,
                                              queue_size=1)
         self.verbose = verbose
@@ -76,16 +81,22 @@ class LineDetectorNode(object):
 
         skeletons, masks = self.detector.detect_lines(image_cv)
 
+        # Create the message and publish
+        skeletons_msg = skeletons_to_msg(skeletons,
+                                         (height_original, width_original),
+                                         top_cutoff=self.top_cutoff)
+        self.pub_skeletons.publish(skeletons_msg)
+
         if self.verbose:
             skeletons_image = skeletons_to_image(skeletons, image_cv.shape)
             skeletons_msg = self.bridge.cv2_to_imgmsg(skeletons_image, 'bgr8')
             skeletons_msg.header.stamp = image_msg.header.stamp
-            self.pub_skeletons.publish(skeletons_msg)
+            self.pub_skeletons_image.publish(skeletons_msg)
 
             masks_image = detections_to_image(masks)
             masks_msg = self.bridge.cv2_to_imgmsg(masks_image, 'bgr8')
             masks_msg.header.stamp = image_msg.header.stamp
-            self.pub_masks.publish(masks_msg)
+            self.pub_masks_image.publish(masks_msg)
 
     def on_shutdown(self):
         self.loginfo('Shutdown...')

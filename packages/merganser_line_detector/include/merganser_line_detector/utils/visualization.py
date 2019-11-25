@@ -15,9 +15,8 @@ def detections_to_image(detections):
 
     return image
 
-def skeletons_to_image(skeletons, image_size):
+def skeletons_to_image(skeletons, image_size, step=0):
     B, G, R = 0, 1, 2
-    step = 64
     image = np.zeros(image_size, dtype=np.uint8)
 
     for index, (x, y) in enumerate(skeletons.white):
