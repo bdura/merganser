@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>merganzer_line_detector</name>
+  <name>merganser_line_detector</name>
   <version>1.0.0</version>
   <description>TODO: Add a description of package `line_detector` in `package.xml`.</description>
 
