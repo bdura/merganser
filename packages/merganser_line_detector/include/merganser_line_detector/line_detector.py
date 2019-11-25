@@ -16,7 +16,7 @@ class LineDetectorHSV(dtu.Configurable):
             'hsv_yellow1', 'hsv_yellow2',
             'hsv_red1', 'hsv_red2',
             'hsv_red3', 'hsv_red4',
-            'hsv_black1', 'hsv_black2'
+            'hsv_black1', 'hsv_black2',
 
             'kernel_size',
             'large_kernel_size'
@@ -28,26 +28,52 @@ class LineDetectorHSV(dtu.Configurable):
         self._large_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
             (self.large_kernel_size, self.large_kernel_size))
 
-    def color_filter(self, hsv_image, road_mask):
-        # The masks are eroded with a small kernel to remove their edges
-        # because they are all combined into a single binary image to only
-        # call skeletonize once (for efficiency).
-
+    def color_filter(self, hsv_image):
         # Filter white
         white_mask = cv2.inRange(hsv_image, self.hsv_white1, self.hsv_white2)
-        # white_mask = cv2.dilate(white_mask, self._kernel, iterations=1)
-        # white_mask = cv2.erode(white_mask, self._kernel, iterations=2)
-        # white_mask = cv2.bitwise_and(white_mask, road_mask)
 
         # Filter yellow
         yellow_mask = cv2.inRange(hsv_image, self.hsv_yellow1, self.hsv_yellow2)
-        yellow_mask = cv2.morphologyEx(yellow_mask, cv2.MORPH_CLOSE, self._large_kernel)
-        # yellow_mask = cv2.erode(yellow_mask, self._kernel, iterations=1)
 
         # Filter red
         red_mask_1 = cv2.inRange(hsv_image, self.hsv_red1, self.hsv_red2)
         red_mask_2 = cv2.inRange(hsv_image, self.hsv_red3, self.hsv_red4)
         red_mask = cv2.bitwise_or(red_mask_1, red_mask_2)
+
+        return Detections(white=white_mask, yellow=yellow_mask, red=red_mask)
+
+    def inlier_filter(self, detections, road_mask):
+        # Merge all the detections with the road mask into a single image
+        binary_image = cv2.bitwise_or(road_mask, detections.white)
+        binary_image = cv2.bitwise_or(binary_image, detections.yellow)
+        binary_image = cv2.bitwise_or(binary_image, detections.red)
+
+        # Use flood fill
+        height, width = binary_image.shape
+        all_mask = np.zeros((height + 2, width + 2), dtype=np.uint8)
+        cv2.floodFill(binary_image, all_mask, (0, height - 1), 255,
+                      flags=cv2.FLOODFILL_MASK_ONLY | (4 | ( 255 << 8 )))
+
+        # Crop the result of flood fill
+        all_mask = all_mask[1:-1, 1:-1]
+        return Detections(white=cv2.bitwise_and(detections.white, all_mask),
+                          yellow=cv2.bitwise_and(detections.yellow, all_mask),
+                          red=cv2.bitwise_and(detections.red, all_mask))
+
+    def apply_transformation(self, detections):
+        # White mask
+        white_mask = detections.white
+        # white_mask = cv2.dilate(white_mask, self._kernel, iterations=1)
+        # white_mask = cv2.erode(white_mask, self._kernel, iterations=2)
+
+        # Yellow mask
+        yellow_mask = detections.yellow
+        yellow_mask = cv2.morphologyEx(yellow_mask, cv2.MORPH_OPEN, self._kernel)
+        yellow_mask = cv2.morphologyEx(yellow_mask, cv2.MORPH_CLOSE, self._large_kernel)
+        # yellow_mask = cv2.erode(yellow_mask, self._kernel, iterations=1)
+
+        # Red mask
+        red_mask = detections.red
         # red_mask = cv2.dilate(red_mask, self._kernel, iterations=1)
         # red_mask = cv2.erode(red_mask, self._kernel, iterations=2)
 
@@ -66,7 +92,8 @@ class LineDetectorHSV(dtu.Configurable):
         # Use flood fill to detect the largest component (corresponding to the road)
         height, width = black_mask.shape
         road_mask = np.zeros((height + 2, width + 2), dtype=np.uint8)
-        cv2.floodFill(connected_mask, road_mask, (0, height - 1), 255)
+        cv2.floodFill(connected_mask, road_mask, (0, height - 1), 255,
+                      flags=cv2.FLOODFILL_MASK_ONLY | (4 | ( 255 << 8 )))
 
         # Filter out the non-road components and dilate it
         road_mask = cv2.bitwise_and(black_mask, road_mask[1:-1, 1:-1])
@@ -126,8 +153,12 @@ class LineDetectorHSV(dtu.Configurable):
         # Get the road mask
         road_mask = self.get_road_mask(hsv_image)
         # Filter the colors
-        color_masks = self.color_filter(hsv_image)
+        raw_color_masks = self.color_filter(hsv_image)
+        # Filter the color masks using the road mask
+        filted_color_masks = self.inlier_filter(raw_color_masks, road_mask)
+        # Apply morphological transformations
+        color_masks = self.apply_transformation(filted_color_masks)
         # Get the skeletons
         skeletons = self.get_skeletons(color_masks)
 
-        return skeletons, (color_masks, road_mask)
+        return skeletons, (raw_color_masks, filted_color_masks, road_mask)

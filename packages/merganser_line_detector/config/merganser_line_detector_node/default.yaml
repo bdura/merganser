@@ -8,7 +8,7 @@ detector:
       large_kernel_size: 11
 
       hsv_white1:  [  0,   0, 150]
-      hsv_white2:  [180,  50, 255]
+      hsv_white2:  [180, 100, 255]
       hsv_yellow1: [ 20, 140, 100]
       hsv_yellow2: [ 45, 255, 255]
       hsv_red1:    [  0, 140, 100]
