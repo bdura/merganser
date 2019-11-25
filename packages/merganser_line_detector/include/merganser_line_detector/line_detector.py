@@ -48,10 +48,15 @@ class LineDetectorHSV(dtu.Configurable):
         binary_image = cv2.bitwise_or(binary_image, detections.yellow)
         binary_image = cv2.bitwise_or(binary_image, detections.red)
 
+        # Find a non-zero index in the bottom row of the binary image
+        # to seed flood fill
+        nonzero_indices, = np.nonzero(binary_image[-1])
+        index = nonzero_indices[0] if nonzero_indices.any() else 0
+
         # Use flood fill
         height, width = binary_image.shape
         all_mask = np.zeros((height + 2, width + 2), dtype=np.uint8)
-        cv2.floodFill(binary_image, all_mask, (0, height - 1), 255,
+        cv2.floodFill(binary_image, all_mask, (index, height - 1), 255,
                       flags=cv2.FLOODFILL_MASK_ONLY | (4 | ( 255 << 8 )))
 
         # Crop the result of flood fill
