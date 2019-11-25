@@ -3,9 +3,9 @@
 import duckietown_utils as dtu
 import rospy
 import numpy as np
-import torch
 import time
-from merganser_bezier.bezier import Bezier, BezierLoss, compute_curve
+from gc import collect
+from merganser_bezier.bezier import Bezier, compute_curve
 from merganser_msgs.msg import BezierMsg, SkeletonMsg, SkeletonsMsg, BeziersMsg
 from duckietown_msgs.msg import Vector2D
 
@@ -16,17 +16,19 @@ class BezierNode(object):
 
         self.stats = Stats()
         # Only be verbose every 10 cycles
-        self.intermittent_interval = 100
+        self.intermittent_interval = 10
         self.intermittent_counter = 0
 
         # Parameters
         self.verbose = False
         self.refit_every = 1
-        self.test = False
+        self.test = True
         self.loss_threshold = .1
+        self.reg = 5e-3
         self.extension = .1
-        self.curve_precision = 100
+        self.curve_precision = 20
         self.fitting_steps = 20
+        self.eps = 1e-3
 
         # Subscribers
         self.sub_skeleton = rospy.Subscriber(
@@ -47,14 +49,13 @@ class BezierNode(object):
         # Attributes
         self.steps = 0
         self.beziers = []
-        self.loss_function = BezierLoss(1e-2)
 
         self.time = 0
         self.n = 0
 
-        if self.test:
-            self.pub_skeletons = rospy.Publisher('~skeletons', SkeletonsMsg, queue_size=1)
-            self.skeletons_timer = rospy.Timer(rospy.Duration.from_sec(.01), self.test_messages)
+        # if self.test:
+        self.pub_skeletons = rospy.Publisher('~skeletons', SkeletonsMsg, queue_size=1)
+        self.skeletons_timer = rospy.Timer(rospy.Duration.from_sec(.01), self.test_messages)
 
     def update_params(self, _event):
         # self.loginfo('Updating parameters...')
@@ -67,13 +68,14 @@ class BezierNode(object):
         self.extension = rospy.get_param('~extension', .1)
         self.curve_precision = rospy.get_param('~curve_precision', 100)
         self.fitting_steps = rospy.get_param('~fitting_steps', 20)
+        self.eps = rospy.get_param('~eps', 1e-2)
 
-        if self.test:
-            self.pub_skeletons = rospy.Publisher('~skeletons', SkeletonsMsg, queue_size=1)
-            self.skeletons_timer = rospy.Timer(rospy.Duration.from_sec(.01), self.test_messages)
-        else:
-            self.pub_skeletons = None
-            self.skeletons_timer = None
+        # if self.test:
+        #     self.pub_skeletons = rospy.Publisher('~skeletons', SkeletonsMsg, queue_size=1)
+        #     self.skeletons_timer = rospy.Timer(rospy.Duration.from_sec(.1), self.test_messages)
+        # else:
+        #     self.pub_skeletons = None
+        #     self.skeletons_timer = None
 
     def test_messages(self, event=None):
 
@@ -129,43 +131,35 @@ class BezierNode(object):
             bezier.extrapolate(0 - self.extension, 1 + self.extension)
 
     def _extract_skeleton(self, skeleton):
-        cloud = torch.Tensor([[point.x, point.y] for point in skeleton.cloud])
+        cloud = np.array([[point.x, point.y] for point in skeleton.cloud])
         color = skeleton.color
 
         return cloud, color
 
     def _process_skeleton(self, skeleton):
 
-        # self.loginfo('Getting cloud')
-
         cloud, color = self._extract_skeleton(skeleton)
 
-        losses = np.array([self.loss_function(b(), cloud) for b in self.beziers])
+        losses = np.array([b.loss(cloud) for b in self.beziers])
         argmin = losses.argmin() if len(losses) > 0 else -1
 
         if argmin > -1 and losses[argmin] < self.loss_threshold:
-            # self.loginfo('Re-using curve...')
             bezier = self.beziers[argmin].copy()
         else:
-            bezier = Bezier(4, self.curve_precision, cloud)
-
-        # self.loginfo('Loss pre-fit : %.5f' % self.loss_function(bezier(), cloud))
+            bezier = Bezier(4, self.curve_precision, choice=cloud, reg=self.reg)
 
         bezier.fit(
             cloud=cloud,
-            loss_function=self.loss_function,
-            steps=self.fitting_steps
+            steps=self.fitting_steps,
+            eps=self.eps,
         )
-
-        # self.loginfo('Loss post-fit : %.5f' % self.loss_function(bezier(), cloud))
-        # self.loginfo(' ')
 
         return bezier, color
 
     def _make_bezier_message(self, bezier, color):
         msg = BezierMsg()
         msg.color = color
-        for i, c in enumerate(bezier.controls.data.numpy()):
+        for i, c in enumerate(bezier.controls):
             msg.controls[i].x = c[0]
             msg.controls[i].y = c[1]
         return msg

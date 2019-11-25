@@ -2,9 +2,7 @@ from copy import deepcopy
 
 import autograd.numpy as np
 from autograd import grad
-from autograd.misc import flatten
-from autograd.misc.optimizers import adam
-from autograd.wrap_util import wraps
+from utils.optimisers import adam
 from scipy.special import comb
 
 
@@ -71,24 +69,30 @@ class Bezier(object):
     def __call__(self):
         return np.matmul(self.bernstein, self.controls)
 
-    def objective(self, params, *args):
+    def objective(self, params, cloud):
         curve = np.matmul(self.bernstein, params)
-        diff = curve.reshape(-1, 1, 2) - self.cloud.reshape(1, -1, 2)
+        diff = curve.reshape(-1, 1, 2) - cloud.reshape(1, -1, 2)
         se = (diff ** 2).mean(axis=2)
 
         return se.min(axis=0).mean() + self.reg * se[[0, -1]].min(axis=1).mean()
 
+    def create_objective(self, cloud):
+
+        def obj(params, *args):
+            return self.objective(params, cloud)
+
+        return obj
+
     def loss(self, cloud):
-        self.cloud = cloud
-        return self.objective(self.controls)
+        return self.objective(self.controls, cloud)
 
     def extrapolate(self, t0, t1):
-        self.controls.data = extrapolate(self.controls, t0, t1)
+        self.controls = extrapolate(self.controls, t0, t1)
 
-    def fit(self, cloud, steps=20):
-        self.cloud = cloud
-        gradient = grad(self.objective)
-        self.controls = adam(gradient, self.controls, step_size=.1, num_iters=steps)
+    def fit(self, cloud, steps=20, lr=.1, eps=1e-3):
+        objective = self.create_objective(cloud)
+        gradient = grad(objective)
+        self.controls = adam(gradient, self.controls, step_size=lr, num_iters=steps, threshold=eps)
 
     def copy(self):
         new = deepcopy(self)
