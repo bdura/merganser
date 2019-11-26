@@ -28,7 +28,7 @@ def plot_fitted_skeleton(beziers, skeletons):
             *to_coordinate(np.vstack((c + .2 * n, c - .2 * n))),
             alpha=.5,
             color='C0',
-            s=10 * np.exp((np.linalg.norm(c + 1 * n, axis=1) - .5) ** 2)
+            s=20 * np.exp(-(np.linalg.norm(c + 1 * n, axis=1) - .5) ** 2)
         )
 
         plt.scatter(*to_coordinate(c_), alpha=.5, color='C' + str(i+1))

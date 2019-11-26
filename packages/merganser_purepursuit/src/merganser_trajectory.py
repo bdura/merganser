@@ -74,7 +74,7 @@ class TrajectoryNode(object):
 
         waypoints = np.vstack(points)
 
-        weights = np.exp((np.linalg.norm(waypoints, axis=1, keepdims=True) - self.lookahead))
+        weights = np.exp(-(np.linalg.norm(waypoints, axis=1, keepdims=True) - self.lookahead) ** 2)
         weights /= weights.sum()
 
         waypoint = (waypoints * weights).sum(axis=0)
@@ -88,7 +88,7 @@ class TrajectoryNode(object):
         rospy.loginfo('[%s] %s' % (self.node_name, s))
 
     def on_shutdown(self):
-        rospy.loginfo("[LaneFilterNode] Shutdown.")
+        self.log("Shutting down.")
 
 
 if __name__ == '__main__':
