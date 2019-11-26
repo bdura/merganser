@@ -45,8 +45,8 @@ class LineDetectorHSV(dtu.Configurable):
     def inlier_filter(self, detections, road_mask):
         # Merge all the detections with the road mask into a single image
         binary_image = cv2.bitwise_or(road_mask, detections.white)
-        binary_image = cv2.bitwise_or(binary_image, detections.yellow)
-        binary_image = cv2.bitwise_or(binary_image, detections.red)
+        # binary_image = cv2.bitwise_or(binary_image, detections.yellow)
+        # binary_image = cv2.bitwise_or(binary_image, detections.red)
 
         # Find a non-zero index in the bottom row of the binary image
         # to seed flood fill
@@ -58,12 +58,18 @@ class LineDetectorHSV(dtu.Configurable):
         all_mask = np.zeros((height + 2, width + 2), dtype=np.uint8)
         cv2.floodFill(binary_image, all_mask, (index, height - 1), 255,
                       flags=cv2.FLOODFILL_MASK_ONLY | (4 | ( 255 << 8 )))
-
-        # Crop the result of flood fill
         all_mask = all_mask[1:-1, 1:-1]
-        return Detections(white=cv2.bitwise_and(detections.white, all_mask),
-                          yellow=cv2.bitwise_and(detections.yellow, all_mask),
-                          red=cv2.bitwise_and(detections.red, all_mask))
+
+        # White mask
+        white_mask = cv2.bitwise_and(detections.white, all_mask)
+
+        # Yellow mask
+        yellow_mask = cv2.bitwise_and(detections.yellow, road_mask)
+
+        # Red mask
+        red_mask = cv2.bitwise_and(detections.red, road_mask)
+
+        return Detections(white=white_mask, yellow=yellow_mask, red=red_mask)
 
     def apply_transformation(self, detections):
         # White mask
@@ -85,6 +91,8 @@ class LineDetectorHSV(dtu.Configurable):
         return Detections(white=white_mask, yellow=yellow_mask, red=red_mask)
 
     def get_road_mask(self, hsv_image):
+        # TODO: detect black and yellow at the same time for the road mask
+        # so that we get a filled mask for the whole road (without any hole)
         black_mask = cv2.inRange(hsv_image, self.hsv_black1, self.hsv_black2)
         black_mask = cv2.morphologyEx(black_mask, cv2.MORPH_OPEN, self._large_kernel)
 
@@ -100,9 +108,14 @@ class LineDetectorHSV(dtu.Configurable):
         cv2.floodFill(connected_mask, road_mask, (0, height - 1), 255,
                       flags=cv2.FLOODFILL_MASK_ONLY | (4 | ( 255 << 8 )))
 
-        # Filter out the non-road components and dilate it
+        # Filter out the non-road components
         road_mask = cv2.bitwise_and(black_mask, road_mask[1:-1, 1:-1])
-        road_mask = cv2.dilate(road_mask, self._kernel, iterations=2)
+        road_mask = cv2.morphologyEx(road_mask,
+                                     cv2.MORPH_CLOSE,
+                                     self._large_kernel,
+                                     iterations=1)
+        # Dilate the mask
+        road_mask = cv2.dilate(road_mask, self._kernel, iterations=1)
 
         return road_mask
 
