@@ -6,10 +6,10 @@ ARG REPO_NAME="merganser"
 ARG ARCH=arm32v7
 ARG MAJOR=daffy
 ARG BASE_TAG=${MAJOR}-${ARCH}
-ARG BASE_IMAGE=dt-core
+ARG BASE_IMAGE=merganser-base
 
 # define base image
-FROM duckietown/${BASE_IMAGE}:${BASE_TAG}
+FROM tristandeleu/${BASE_IMAGE}:${BASE_TAG}
 
 # define repository path
 ARG REPO_NAME
@@ -28,8 +28,6 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     $(awk -F: '/^[^#]/ { print $1 }' dependencies-apt.txt | uniq) \
   && rm -rf /var/lib/apt/lists/*
-
-RUN pip install autograd scikit-image>=0.14.5
 
 # install python dependencies
 RUN pip install -r ${REPO_PATH}/dependencies-py.txt
