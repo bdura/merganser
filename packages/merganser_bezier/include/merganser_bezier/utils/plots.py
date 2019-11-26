@@ -9,16 +9,32 @@ from .skeletons import _extract_skeleton
 
 
 def plot_fitted_skeleton(beziers, skeletons):
+    def to_coordinate(coords):
+        coords = coords.T[[1, 0]]
+        coords = coords * np.array([[1.], [-1.]])
+        return coords
 
     plt.figure()
 
     for i, (b, s) in enumerate(zip(beziers, skeletons)):
-        c, _ = _extract_skeleton(s)
+        c_, _ = _extract_skeleton(s)
 
-        plt.scatter(*c.T, alpha=.5, color='C' + str(i))
-        # plt.plot(*b().T, alpha=1, color='C' + str(i), size=2)
-        plt.plot(*b().T, alpha=1, color='C' + str(i))
-        plt.scatter(*b.controls.T, alpha=1, color='C' + str(i))
+        c = b()
+        n = b.normal()
+
+        plt.scatter([0], [0], color='black')
+
+        plt.scatter(
+            *to_coordinate(np.vstack((c + .2 * n, c - .2 * n))),
+            alpha=.5,
+            color='C0',
+            s=10 * np.exp((np.linalg.norm(c + 1 * n, axis=1) - .5) ** 2)
+        )
+
+        plt.scatter(*to_coordinate(c_), alpha=.5, color='C' + str(i+1))
+
+        plt.plot(*to_coordinate(b()), alpha=1, color='C' + str(i+1))
+        plt.scatter(*to_coordinate(b.controls), alpha=1, color='C' + str(i+1))
 
     buf = io.BytesIO()
     plt.savefig(buf, format='jpeg', dpi=150)

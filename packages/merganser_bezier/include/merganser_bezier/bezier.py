@@ -66,6 +66,12 @@ class Bezier(object):
         self.cloud = None
         self.reg = reg
 
+    @classmethod
+    def from_controls(cls, controls, precision=10):
+        bezier = Bezier(4, precision)
+        bezier.controls = controls
+        return bezier
+
     def __call__(self):
         return np.matmul(self.bernstein, self.controls)
 
@@ -74,7 +80,7 @@ class Bezier(object):
         diff = curve.reshape(-1, 1, 2) - cloud.reshape(1, -1, 2)
         se = (diff ** 2).mean(axis=2)
 
-        return se.min(axis=0).mean() + self.reg * se.min(axis=1).mean()
+        return se.min(axis=0).mean() + self.reg * se[[0, 1]].min(axis=1).mean()
 
     def create_objective(self, cloud):
 
@@ -93,6 +99,26 @@ class Bezier(object):
         objective = self.create_objective(cloud)
         gradient = grad(objective)
         self.controls = adam(gradient, self.controls, step_size=lr, num_iters=steps, threshold=eps)
+
+    def derivative(self):
+        n = len(self.controls)
+        c0, cn = self.controls[:-1], self.controls[1:]
+
+        c = n * (cn - c0)
+        d = compute_curve(c, len(self.bernstein))
+
+        return d
+
+    def normal(self):
+        # Gets the derivative
+        d = self.derivative()
+
+        # Normalises the derivative
+        d = d / np.linalg.norm(d, axis=1, keepdims=True)
+
+        rot = np.array([[0, 1], [-1, 0]])
+
+        return np.matmul(rot, d.T).T
 
     def copy(self):
         new = deepcopy(self)
