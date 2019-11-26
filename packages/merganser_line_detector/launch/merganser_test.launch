@@ -15,7 +15,7 @@
         <arg name="anti_instagram" default="true" />
         <arg name="ai_trafo_mode" value="$(arg ai_trafo_mode)"/>
         <arg name="ai_interval" value="$(arg ai_interval)"/>
-        <arg name="/lane_following/stop_line_filter" default="false" /> <!-- will not every allow a transition into COORDINATION mode -->
+        <arg name="/lane_following/stop_line_filter" default="false" />
         <arg name="vehicle_avoidance" default="false"/>
     </include>
 
@@ -23,6 +23,9 @@
         <remap from="merganser_line_detector_node/corrected_image/compressed" to="anti_instagram_node/corrected_image/compressed"/>
         <remap from="merganser_line_detector_node/skeletons" to="merganser_ground_projection/skeleton_in"/>
         <remap from="merganser_ground_projection/skeleton_out" to="merganser_bezier_node/skeletons"/>
+
+        <remap from="merganser_bezier_node/beziers" to="merganser_trajectory/beziers"/>
+        <remap from="merganser_trajectory/waypoint" to="merganser_purepursuit/waypoint"/>
 
         <include file="$(find merganser_line_detector)/launch/merganser_line_detector_node.launch">
             <arg name="veh" value="$(arg veh)"/>
@@ -35,6 +38,14 @@
         </include>
 
         <include file="$(find merganser_ground_projection)/launch/ground_projection.launch">
+            <arg name="veh" value="$(arg veh)"/>
+        </include>
+
+        <include file="$(find merganser_purepursuit)/launch/purepursuit_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+        </include>
+
+        <include file="$(find merganser_purepursuit)/launch/trajectory_node.launch">
             <arg name="veh" value="$(arg veh)"/>
         </include>
     </group>

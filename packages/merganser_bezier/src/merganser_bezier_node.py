@@ -166,8 +166,6 @@ class BezierNode(object):
 
     def process_skeletons(self, skeletons_msg):
 
-        # self.loginfo('Got skeletons')
-
         t0 = time.time()
 
         self.stats.received()

@@ -31,7 +31,11 @@ class GroundProjectionNode(object):
 
         for skeleton in skeletons_msg.skeletons:
             for p in skeleton.cloud:
+
+                # p.x, p.y = 1 - p.x, p.y
                 point = self.gpg.vector2ground(p)
+                # print(point.x, point.x)
+
                 p.x, p.y = point.x, point.y
 
         self.pub_skeleton.publish(skeletons_msg)
