@@ -15,5 +15,5 @@ detector:
       hsv_red2:    [ 15, 255, 255]
       hsv_red3:    [165, 140, 100]
       hsv_red4:    [180, 255, 255]
-      hsv_black1:  [  0,   0,   0]
-      hsv_black2:  [180, 255,  80]
+
+      threshold_black: 80
