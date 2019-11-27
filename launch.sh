@@ -4,4 +4,5 @@ set -e
 
 # YOUR CODE BELOW THIS LINE
 # ----------------------------------------------------------------------------
-echo "This is an empty launch script. Update it to launch your application."
+echo "Launching Merganser."
+roslaunch merganser_line_detector merganser_test.launch
