@@ -8,3 +8,4 @@ __pycache__/
 *.mp4
 
 notebooks/output/
+*log*.json

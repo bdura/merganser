@@ -2,8 +2,21 @@ from copy import deepcopy
 
 import autograd.numpy as np
 from autograd import grad
-from .utils.optimisers import adam
 from scipy.special import comb
+
+from .utils.optimisers import adam
+
+
+def memoize(func):
+    memory = dict()
+
+    def f(*args):
+        key = str(args)
+        if key not in memory:
+            memory[key] = func(*args)
+        return memory[key]
+
+    return f
 
 
 def bernstein(t, n):
@@ -35,9 +48,14 @@ def compute(t, controls):
     return np.matmul(b, controls)
 
 
+@memoize
+def get_bernstein(precision=100):
+    ts = np.linspace(0, 1, precision)
+    return np.asarray([bernstein(t, 4) for t in ts])
+
+
 def compute_curve(controls, n=100):
-    ts = np.linspace(0, 1, n)
-    b = np.asarray([bernstein(t, len(controls)) for t in ts])
+    b = get_bernstein(n)
     return np.matmul(b, controls)
 
 
@@ -52,15 +70,19 @@ class Bezier(object):
         if choice is None or len(choice) < order:
             controls = np.random.normal(size=(order, 2))
         else:
-            permutation = np.arange(choice.shape[0], dtype='uint')
-            np.random.shuffle(permutation)
+            x_argmin, x_argmax = choice[:, 0].argmin(), choice[:, 0].argmax()
+            y_argmin, y_argmax = choice[:, 1].argmin(), choice[:, 1].argmax()
 
-            indices = permutation[:order]
+            x_norm = ((choice[x_argmax] - choice[x_argmin]) ** 2).sum()
+            y_norm = ((choice[y_argmax] - choice[y_argmin]) ** 2).sum()
 
-            controls = choice[indices]
+            if x_norm > y_norm:
+                argmin, argmax = x_argmin, x_argmax
+            else:
+                argmin, argmax = y_argmin, y_argmax
 
-            arg = controls[:, 1].argsort()
-            controls = controls[arg]
+            controls = choice[[argmin]] + (choice[[argmax]] - choice[[argmin]]) * np.linspace(0, 1, 4).reshape(-1, 1)
+
         self.controls = controls
 
         self.cloud = None
@@ -74,6 +96,26 @@ class Bezier(object):
 
     def __call__(self):
         return np.matmul(self.bernstein, self.controls)
+
+    def nll(self, cloud):
+        curve = self()
+        diff = curve.reshape(-1, 1, 2) - cloud.reshape(1, -1, 2)
+        se = (diff ** 2).sum(axis=2)
+        return se.min(axis=0).sum()
+
+    def closed_form(self, cloud):
+        curve = self()
+        diff = curve.reshape(-1, 1, 2) - cloud.reshape(1, -1, 2)
+        se = (diff ** 2).mean(axis=2)
+
+        argmin = se.argmin(axis=0)
+
+        b = self.bernstein[argmin]
+
+        btb_inv = np.linalg.inv(np.matmul(b.T, b))
+        btb_inv_bt = np.matmul(btb_inv, b.T)
+
+        self.controls = np.matmul(btb_inv_bt, cloud)
 
     def objective(self, params, cloud):
         curve = np.matmul(self.bernstein, params)
