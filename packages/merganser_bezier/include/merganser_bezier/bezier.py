@@ -49,13 +49,14 @@ def compute(t, controls):
 
 
 @memoize
-def get_bernstein(precision=100):
+def get_bernstein(precision=100, order=4):
     ts = np.linspace(0, 1, precision)
-    return np.asarray([bernstein(t, 4) for t in ts])
+    return np.asarray([bernstein(t, order) for t in ts])
 
 
 def compute_curve(controls, n=100):
-    b = get_bernstein(n)
+    order = len(controls)
+    b = get_bernstein(n, order)
     return np.matmul(b, controls)
 
 
