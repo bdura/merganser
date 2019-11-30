@@ -7,7 +7,7 @@
 
     <group ns="$(arg veh)">
         <node pkg="$(arg pkg_name)" type="$(arg node_name).py" name="$(arg node_name)" output="screen" required="true">
-            <param name="~config_file_name" value="$(arg veh)"/>
+            <param name="~veh_name" value="$(arg veh)"/>
         </node>
     </group>
 </launch>
