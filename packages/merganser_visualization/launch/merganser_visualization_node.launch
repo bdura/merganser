@@ -1,0 +1,12 @@
+<launch>
+    <arg name="veh" doc="Name of vehicle. ex: megaman"/>
+    <arg name="pkg_name" value="merganser_visualization"/>
+    <arg name="node_name" default="merganser_visualization_node"/>
+    <arg name="verbose" default="false" />
+
+    <group ns="$(arg veh)">
+        <node name="$(arg node_name)" pkg="$(arg pkg_name)" type="$(arg node_name).py" output="screen" required="true">
+            <param name="verbose" value="$(arg verbose)"/>
+        </node>
+    </group>
+</launch>

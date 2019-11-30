@@ -148,7 +148,7 @@ class Bezier(object):
         c0, cn = self.controls[:-1], self.controls[1:]
 
         c = n * (cn - c0)
-        d = compute_curve(c, len(self.bernstein))
+        d = compute_curve(c, len(self.bernstein), order=3)
 
         return d
 
