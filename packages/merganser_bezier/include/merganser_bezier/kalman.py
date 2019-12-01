@@ -6,13 +6,12 @@ from scipy.linalg import block_diag
 
 class KalmanFilter(object):
 
-    def __init__(self, mu, process_noise=.1, measurement_noise=.1):
+    def __init__(self, mu, process_noise=.1):
 
         self.mu = mu
         self.sigma = np.zeros((8, 8))
 
         self.r = process_noise * np.eye(8)
-        self.q_ = (1 / measurement_noise) * np.eye(2)
 
     def predict(self, dx, dtheta):
         # Constructs the rotation matrix
@@ -38,12 +37,14 @@ class KalmanFilter(object):
         arg = ((bezier().reshape(1, -1, 2) - cloud.reshape((-1, 1, 2))) ** 2).sum(axis=2).argmin(axis=1)
         b = bezier.bernstein[arg]
 
+        cov = np.cov(np.matmul(b, self.mu).T)
+
         b = np.array([
             np.hstack([b__ * np.eye(2) for b__ in b_])
             for b_ in b
         ])
 
-        btq_ = np.matmul(b.transpose((0, 2, 1)), self.q_)
+        btq_ = np.matmul(b.transpose((0, 2, 1)), np.linalg.inv(cov))
 
         sigma_bar_inv = np.linalg.inv(self.sigma)
 
