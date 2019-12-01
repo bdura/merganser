@@ -12,7 +12,7 @@ def skeleton_to_msg(skeleton, color, original_image_size, top_cutoff=0):
     y_float = y_indices.astype(np.float32)
 
     # Normalize the indices in [0, 1]
-    y_float =  1. - ((y_float + top_cutoff) / height)
+    y_float = (y_float + top_cutoff) / height
     x_float = x_float / width
 
     # Create message
