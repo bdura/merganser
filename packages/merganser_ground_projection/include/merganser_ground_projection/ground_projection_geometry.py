@@ -70,11 +70,11 @@ class GroundProjectionGeometry(object):
         camera_width = self.camera_info.width
         camera_height = self.camera_info.height
 
-        pixels_x = np.asarray([vector.x for vector in vectors]) * camera_width
-        pixels_y = np.asarray([vector.y for vector in vectors]) * camera_height
-        pixels_z = np.ones_like(pixels_x)
+        pixels_u = np.asarray([vector.x for vector in vectors]) * camera_width
+        pixels_v = np.asarray([vector.y for vector in vectors]) * camera_height
+        pixels_w = np.ones_like(pixels_u)
 
-        uv_raws = np.stack((pixels_x, pixels_y, pixels_z), axis=0)
+        uv_raws = np.stack((pixels_u, pixels_v, pixels_w), axis=0)
         xs, ys, zs = np.dot(self.homography, uv_raws)
 
         return [Point(x=x / z, y=y / z, z=0.) for (x, y, z) in zip(xs, ys, zs)]

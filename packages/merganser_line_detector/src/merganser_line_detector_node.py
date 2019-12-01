@@ -16,6 +16,7 @@ from merganser_line_detector.utils import (detections_to_image,
 class LineDetectorNode(object):
     def __init__(self):
         self.node_name = rospy.get_name()
+        self.loginfo('Initializing...')
 
         self.bridge = CvBridge()
 
@@ -39,11 +40,9 @@ class LineDetectorNode(object):
                                              queue_size=1)
 
         self.update_params(None)
+        self.loginfo('Initialized')
 
         rospy.Timer(rospy.Duration.from_sec(2.), self.update_params)
-
-    def loginfo(self, message):
-        rospy.loginfo(message)
 
     def update_params(self, _event):
         verbose = rospy.get_param('~verbose', True)
@@ -57,11 +56,11 @@ class LineDetectorNode(object):
 
         if verbose and (self.pub_skeletons_image is None):
             self.pub_skeletons_image = rospy.Publisher('~skeletons_image',
-                                                 Image,
-                                                 queue_size=1)
+                                                       Image,
+                                                       queue_size=1)
             self.pub_masks_image = rospy.Publisher('~masks_image',
-                                             Image,
-                                             queue_size=1)
+                                                   Image,
+                                                   queue_size=1)
             self.pub_road_mask_image = rospy.Publisher('~road_mask_image',
                                                        Image,
                                                        queue_size=1)
@@ -87,7 +86,7 @@ class LineDetectorNode(object):
 
         # Create the message and publish
         skeletons_msg = skeletons_to_msg(skeletons,
-                                         (height_original, width_original),
+                                         self.img_size,
                                          top_cutoff=self.top_cutoff)
         self.pub_skeletons.publish(skeletons_msg)
 
@@ -109,8 +108,11 @@ class LineDetectorNode(object):
             road_mask_msg.header.stamp = image_msg.header.stamp
             self.pub_road_mask_image.publish(road_mask_msg)
 
+    def loginfo(self, message):
+        rospy.loginfo('[{0}] {1}'.format(self.node_name, message))
+
     def on_shutdown(self):
-        self.loginfo('Shutdown...')
+        self.loginfo('Shutting down')
 
 
 if __name__ == '__main__':
