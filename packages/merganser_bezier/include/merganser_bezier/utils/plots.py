@@ -10,7 +10,7 @@ from .skeletons import _extract_skeleton
 
 def to_coordinate(coords):
     coords = coords.T[[1, 0]]
-    # coords = coords * np.array([[1.], [-1.]])
+    coords = coords * np.array([[1.], [-1.]])
     return coords
 
 
