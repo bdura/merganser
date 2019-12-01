@@ -8,6 +8,7 @@
     <group ns="$(arg veh)">
         <node pkg="$(arg pkg_name)" type="$(arg node_name).py" name="$(arg node_name)" output="screen" required="true">
             <param name="~veh_name" value="$(arg veh)"/>
+            <rosparam command="load" file="$(find merganser_ground_projection)/homography/default.yaml"/>
         </node>
     </group>
 </launch>

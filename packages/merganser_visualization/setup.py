@@ -9,7 +9,8 @@ setup_args = generate_distutils_setup(
         'merganser_visualization'
     ],
     package_dir={
-        'merganser_visualization': 'include/merganser_visualization'
+        'merganser_visualization': 'include/merganser_visualization',
+        '': 'src'
     },
 )
 

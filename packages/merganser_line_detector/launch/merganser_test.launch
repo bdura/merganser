@@ -25,6 +25,7 @@
         <remap from="merganser_bezier_node/skeletons" to="merganser_ground_projection_node/skeleton_out"/>
 
         <remap from="merganser_bezier_node/beziers" to="merganser_trajectory/beziers"/>
+        <remap from="merganser_bezier_node/command" to="merganser_purepursuit/command"/>
         <remap from="merganser_trajectory/waypoint" to="merganser_purepursuit/waypoint"/>
 
         <include file="$(find merganser_line_detector)/launch/merganser_line_detector_node.launch">

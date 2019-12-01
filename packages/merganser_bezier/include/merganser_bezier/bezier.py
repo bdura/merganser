@@ -9,9 +9,17 @@ from .utils.bernstein import get_bernstein, compute_curve, extrapolate
 from .kalman import KalmanFilter
 
 
+COLORS = {
+    0: 'white',
+    1: 'yellow',
+    2: 'red',
+    -1: 'gray'
+}
+
+
 class Bezier(object):
 
-    def __init__(self, order, precision, reg=5e-3, process_noise=.01, loss_threshold=.001):
+    def __init__(self, order, precision, reg=5e-3, process_noise=.01, loss_threshold=.001, color=-1):
         super(Bezier, self).__init__()
 
         self.bernstein = get_bernstein(precision=precision, order=order)
@@ -23,6 +31,8 @@ class Bezier(object):
 
         self.loss_threshold = loss_threshold
         self.filter = KalmanFilter(dimension=order, process_noise=process_noise)
+
+        self.color = COLORS[color]
 
     def initialise(self, cloud):
 
@@ -61,8 +71,8 @@ class Bezier(object):
         return np.matmul(self.bernstein, self.controls)
 
     @classmethod
-    def from_controls(cls, controls, precision=10):
-        bezier = Bezier(4, precision)
+    def from_controls(cls, controls, precision=10, **kwargs):
+        bezier = Bezier(4, precision, **kwargs)
         bezier.controls = controls
         return bezier
 
@@ -126,6 +136,17 @@ class Bezier(object):
     def kalman(self, dx, dtheta, cloud):
         self.filter.fit(dx, dtheta, cloud)
         self.controls = self.filter.mu.reshape((len(self.controls), 2))
+
+    def predict(self, dx, dtheta):
+        self.filter.predict(dx, dtheta)
+        self.controls = self.filter.mu.reshape((len(self.controls), 2))
+
+    def correct(self, cloud):
+        self.filter.correct(cloud)
+        self.controls = self.filter.mu.reshape((len(self.controls), 2))
+
+        if self.loss(cloud) > self.loss_threshold:
+            self.collapse(cloud)
 
     def step(self, dx, dtheta, cloud):
 
