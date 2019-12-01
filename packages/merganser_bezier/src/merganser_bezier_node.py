@@ -51,7 +51,7 @@ class BezierNode(object):
         self.dx = 0
         self.dtheta = 0
 
-        self.time = time.time()
+        self.t = time.time()
 
         # Publishers
         self.pub_bezier = rospy.Publisher('~beziers', BeziersMsg, queue_size=1)
@@ -91,8 +91,8 @@ class BezierNode(object):
     @property
     def dt(self):
         t = time.time()
-        dt = t - self.time
-        self.time = t
+        dt = t - self.t
+        self.t = t
         return dt
 
     def update_commands(self, msg):
