@@ -34,9 +34,6 @@ def plot_fitted_skeleton(beziers, skeletons):
     ax = fig.add_subplot(1, 1, 1)
     ax.set_facecolor('black')
 
-    plt.xlim(0, 1)
-    plt.ylim(0, .8)
-
     ax.scatter([0], [0], color='white')
 
     for i, (b, s) in enumerate(zip(beziers, skeletons)):
@@ -55,9 +52,6 @@ def plot_waypoint(beziers, waypoint, waypoints):
     fig = plt.figure(figsize=(8, 5))
     ax = fig.add_subplot(1, 1, 1)
     ax.set_facecolor('black')
-
-    plt.xlim(0, 1)
-    plt.ylim(0, .8)
 
     ax.scatter([0], [0], color='white')
 

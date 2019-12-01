@@ -25,8 +25,12 @@
         <remap from="merganser_bezier_node/skeletons" to="merganser_ground_projection_node/skeleton_out"/>
 
         <remap from="merganser_bezier_node/beziers" to="merganser_trajectory/beziers"/>
-        <remap from="merganser_bezier_node/command" to="merganser_purepursuit/command"/>
         <remap from="merganser_trajectory/waypoint" to="merganser_purepursuit/waypoint"/>
+
+        <remap from="merganser_bezier_node/command" to="car_cmd_switch_node/cmd"/>
+        <remap from="merganser_purepursuit/command" to="car_cmd_switch_node/cmd"/>
+
+        <remap from="merganser_visualization_node/skeletons" to="merganser_ground_projection_node/skeleton_out"/>
 
         <include file="$(find merganser_line_detector)/launch/merganser_line_detector_node.launch">
             <arg name="veh" value="$(arg veh)"/>
@@ -50,7 +54,6 @@
             <arg name="veh" value="$(arg veh)"/>
         </include>
 
-        <remap from="merganser_visualization_node/skeletons" to="merganser_ground_projection_node/skeleton_out"/>
         <include file="$(find merganser_visualization)/launch/merganser_visualization_node.launch">
             <arg name="veh" value="$(arg veh)"/>
         </include>

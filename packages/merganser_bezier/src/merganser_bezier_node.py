@@ -41,7 +41,7 @@ class BezierNode(object):
             queue_size=1
         )
 
-        self.sub_skeleton = rospy.Subscriber(
+        self.sub_commands = rospy.Subscriber(
             '~command',
             Twist2DStamped,
             self.update_commands,
@@ -109,6 +109,7 @@ class BezierNode(object):
 
     def _extract_skeleton(self, skeleton):
         cloud = np.array([[point.x, point.y] for point in skeleton.cloud])
+        # print('Bez', sum([p.x for p in skeleton.cloud]) / len(skeleton.cloud))
         color = skeleton.color
 
         return cloud, color
