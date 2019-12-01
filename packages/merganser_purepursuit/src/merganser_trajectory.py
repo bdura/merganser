@@ -97,6 +97,8 @@ class TrajectoryNode(object):
             whites = sorted(whites, key=lambda b: b.controls[:, 0].mean())
             right, left = whites[0], whites[-1]
         elif len(whites) == 1:
+            # If there is only one white line, we assume the one visible is on the right
+            # The hypothesis is that we need to cross the yellow line for this to be the case
             right, left = whites[0], None
         else:
             right, left = None, None
@@ -104,6 +106,8 @@ class TrajectoryNode(object):
         if yellow is not None and right is not None:
             # waypoints = Bezier.from_controls((yellow.controls + right.controls) / 2, color='green')()
             waypoints = (yellow() + right()) / 2
+        elif yellow is not None:
+            waypoints = yellow() - self.correction * yellow.normal()
         elif right is not None:
             waypoints = right() + self.correction * right.normal()
         else:
