@@ -10,7 +10,7 @@ from .skeletons import _extract_skeleton
 
 def to_coordinate(coords):
     coords = coords.T[[1, 0]]
-    coords = coords * np.array([[1.], [-1.]])
+    coords = coords * np.array([[-1.], [1.]])
     return coords
 
 
@@ -67,7 +67,7 @@ def plot_waypoint(beziers, waypoint, waypoints):
     ax.plot(*to_coordinate(waypoints), alpha=1, lw=5, color='green', zorder=2)
 
     x, y = waypoint
-    ax.scatter([y], [x], color='red', zorder=3)
+    ax.scatter([-y], [x], color='red', zorder=3)
 
     plt.axis('scaled')
 
