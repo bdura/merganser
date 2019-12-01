@@ -41,7 +41,7 @@ class GroundProjectionNode(object):
 
         skeletons_out_msg = SkeletonsMsg()
         skeletons_out_msg.skeletons = skeletons
-        self.pub_skeleton.publish(skeletons_msg)
+        self.pub_skeleton.publish(skeletons_out_msg)
 
     def loginfo(self, message):
         rospy.loginfo('[{0}] {1}'.format(self.node_name, message))
