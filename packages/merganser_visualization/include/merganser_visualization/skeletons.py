@@ -1,5 +1,6 @@
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Point, Vector3
 
 from merganser_visualization.general import color_to_rgba
 
@@ -14,18 +15,20 @@ def skeleton_to_marker(skeleton, veh_name='default'):
     marker.lifetime = rospy.Duration.from_sec(5.0)
     marker.type = Marker.POINTS
     marker.color = color_to_rgba(skeleton.color)
-    marker.scale.x = 0.02
+    marker.scale = Vector3(x=0.02, y=0.02, z=1.)
 
     for vector in skeleton.cloud:
-        # TODO: Convert vector to Vector3D?
-        marker.points.append(vector)
+        marker.points.append(Point(x=vector.x, y=vector.y, z=0.))
 
     return marker
 
 def skeletons_to_marker_array(skeletons, veh_name='default'):
-    marker_array = MarkerArray()
-    for skeleton in skeletons:
+    markers = []
+    for skeleton in skeletons.skeletons:
         marker = skeleton_to_marker(skeleton, veh_name=veh_name)
-        marker_array.markers.append(marker)
+        markers.append(marker)
+
+    marker_array = MarkerArray()
+    marker_array.markers = markers
 
     return marker_array

@@ -17,14 +17,14 @@ class VisualizationNode(object):
         self.veh_name = self.setup_parameter('~veh_name', 'default')
 
         # Publishers
-        self.pub_skeletons = rospy.Publishers('~skeletons_markers',
-                                              MarkerArray,
-                                              queue_size=1)
+        self.pub_skeletons = rospy.Publisher('~skeletons_markers',
+                                             MarkerArray,
+                                             queue_size=1)
 
         # Subscribers
-        self.sub_skeletons = rospy.Subscribers('~skeletons',
-                                               SkeletonsMsg,
-                                               self.callback_skeletons)
+        self.sub_skeletons = rospy.Subscriber('~skeletons',
+                                              SkeletonsMsg,
+                                              self.callback_skeletons)
 
         self.loginfo('Initialized')
 
