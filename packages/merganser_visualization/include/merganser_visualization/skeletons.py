@@ -5,12 +5,12 @@ from geometry_msgs.msg import Point, Vector3
 from merganser_visualization.general import color_to_rgba
 
 
-def skeleton_to_marker(skeleton, veh_name='default'):
+def skeleton_to_marker(skeleton, index, veh_name='default'):
     marker = Marker()
     marker.header.frame_id = veh_name
 
     marker.ns = '{0}/skeleton_points'.format(veh_name)
-    marker.id = 0
+    marker.id = index
     marker.action = Marker.ADD
     marker.lifetime = rospy.Duration.from_sec(5.0)
     marker.type = Marker.POINTS
@@ -24,8 +24,8 @@ def skeleton_to_marker(skeleton, veh_name='default'):
 
 def skeletons_to_marker_array(skeletons, veh_name='default'):
     markers = []
-    for skeleton in skeletons.skeletons:
-        marker = skeleton_to_marker(skeleton, veh_name=veh_name)
+    for index, skeleton in enumerate(skeletons.skeletons):
+        marker = skeleton_to_marker(skeleton, index, veh_name=veh_name)
         markers.append(marker)
 
     marker_array = MarkerArray()
