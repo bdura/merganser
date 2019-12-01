@@ -7,6 +7,10 @@ from geometry_msgs.msg import Point
 from merganser_msgs.msg import BeziersMsg
 from merganser_bezier.bezier import Bezier, compute_curve
 
+from merganser_bezier.utils.plots import plot_waypoint
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+
 
 class Color(Enum):
     WHITE = 0
@@ -20,9 +24,11 @@ class TrajectoryNode(object):
 
         self.node_name = "Trajectory Node"
 
-        self.lookahead = 0.5
-        self.correction = 0.5
+        self.lookahead = 0.2
+        self.correction = 0.2
         self.alpha = 0.1
+
+        self.iters = 0
 
         self.waypoint = np.zeros(2)
 
@@ -33,8 +39,11 @@ class TrajectoryNode(object):
         # Subscriber
         self.sub_filtered_segments = rospy.Subscriber('~beziers', BeziersMsg, self.process_beziers)
 
+        self.bridge = CvBridge()
+
         # Publisher
         self.pub_waypoint = rospy.Publisher('~waypoint', Point, queue_size=1)
+        self.pub_image = rospy.Publisher('~image', Image, queue_size=1)
 
     def update_params(self, _event=None):
 
@@ -51,7 +60,7 @@ class TrajectoryNode(object):
         if c[0, 0] > c[-1, 0]:
             c = c[[3, 2, 1, 0]]
 
-        b = Bezier.from_controls(c)
+        b = Bezier.from_controls(c, color=color)
 
         return b, color
 
@@ -60,6 +69,8 @@ class TrajectoryNode(object):
 
         if len(message.beziers) == 0:
             return
+
+        beziers = []
 
         for m in message.beziers:
             b, color = self.get_bezier_curve(m)
@@ -72,17 +83,56 @@ class TrajectoryNode(object):
             elif Color(color) == Color.RED:
                 points.append(p - self.correction * n)
 
-        waypoints = np.vstack(points)
+            beziers.append(b)
 
-        weights = np.exp(-(np.linalg.norm(waypoints, axis=1, keepdims=True) - self.lookahead) ** 2)
-        weights /= weights.sum()
+        yellows = [b for b in beziers if b.color == 'yellow']
+        whites = [b for b in beziers if b.color == 'white']
 
-        waypoint = (waypoints * weights).sum(axis=0)
+        if len(yellows) > 0:
+            yellow = yellows[0]
+        else:
+            yellow = None
 
-        self.waypoint = waypoint * self.alpha + self.waypoint * (1 - self.alpha)
+        if len(whites) > 1:
+            whites = sorted(whites, key=lambda b: b.controls[:, 1].mean())
+            right, left = whites[0], whites[-1]
+        elif len(whites) == 1:
+            # If there is only one white line, we assume the one visible is on the right
+            # The hypothesis is that we need to cross the yellow line for this to be the case
+            right, left = whites[0], None
+        else:
+            right, left = None, None
 
-        w = Point(self.waypoint[0], self.waypoint[1], 0)
-        self.pub_waypoint.publish(w)
+        if yellow is not None \
+                and right is not None \
+                and yellow.controls[:, 1].mean() > right.controls[:, 1].mean():
+            # waypoints = Bezier.from_controls((yellow.controls + right.controls) / 2, color='green')()
+            waypoints = (yellow() + right()) / 2
+        elif yellow is not None:
+            waypoints = yellow() - self.correction * yellow.normal()
+        elif right is not None:
+            waypoints = right() + self.correction * right.normal()
+        else:
+            waypoints = None
+
+        if waypoints is not None:
+
+            arg = np.abs(np.linalg.norm(waypoints, axis=1) - self.lookahead).argmin()
+
+            waypoint = waypoints[arg]
+
+            self.waypoint += self.alpha * (waypoint - self.waypoint)
+
+            w = Point(self.waypoint[0], self.waypoint[1], 0)
+            self.pub_waypoint.publish(w)
+
+        self.iters += 1
+
+        if self.iters % 10 == 0:
+            img = plot_waypoint(beziers, self.waypoint, waypoints)
+            img_message = self.bridge.cv2_to_imgmsg(img, 'bgr8')
+
+            self.pub_image.publish(img_message)
 
     def log(self, s):
         rospy.loginfo('[%s] %s' % (self.node_name, s))

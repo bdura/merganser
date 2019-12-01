@@ -8,34 +8,13 @@ import io
 from .skeletons import _extract_skeleton
 
 
-def plot_fitted_skeleton(beziers, skeletons):
-    def to_coordinate(coords):
-        coords = coords.T[[1, 0]]
-        coords = coords * np.array([[1.], [-1.]])
-        return coords
+def to_coordinate(coords):
+    coords = coords.T[[1, 0]]
+    coords = coords * np.array([[-1.], [1.]])
+    return coords
 
-    plt.figure()
 
-    for i, (b, s) in enumerate(zip(beziers, skeletons)):
-        c_, _ = _extract_skeleton(s)
-
-        c = b()
-        n = b.normal()
-
-        plt.scatter([0], [0], color='black')
-
-        plt.scatter(
-            *to_coordinate(np.vstack((c + .2 * n, c - .2 * n))),
-            alpha=.5,
-            color='C0',
-            s=20 * np.exp(-(np.linalg.norm(c + 1 * n, axis=1) - .5) ** 2)
-        )
-
-        plt.scatter(*to_coordinate(c_), alpha=.5, color='C' + str(i+1))
-
-        plt.plot(*to_coordinate(b()), alpha=1, color='C' + str(i+1))
-        plt.scatter(*to_coordinate(b.controls), alpha=1, color='C' + str(i+1))
-
+def plt2img():
     buf = io.BytesIO()
     plt.savefig(buf, format='jpeg', dpi=150)
     buf.seek(0)
@@ -46,7 +25,47 @@ def plot_fitted_skeleton(beziers, skeletons):
     buf.close()
     plt.close()
 
-    return img
+    return img[..., [2, 1, 0]]
+
+
+def plot_fitted_skeleton(beziers, skeletons):
+
+    fig = plt.figure(figsize=(8, 5))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.set_facecolor('black')
+
+    ax.scatter([0], [0], color='white')
+
+    for i, (b, s) in enumerate(zip(beziers, skeletons)):
+        c_, _ = _extract_skeleton(s)
+
+        ax.scatter(*to_coordinate(c_), alpha=.5, color=b.color)  # 'C' + str(i+1))
+
+        ax.plot(*to_coordinate(b()), alpha=1, lw=5, color=b.color)  # 'C' + str(i+1))
+        ax.scatter(*to_coordinate(b.controls), alpha=1, color=b.color)  # 'C' + str(i+1))
+
+    return plt2img()
+
+
+def plot_waypoint(beziers, waypoint, waypoints):
+
+    fig = plt.figure(figsize=(8, 5))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.set_facecolor('black')
+
+    ax.scatter([0], [0], color='white')
+
+    for i, b in enumerate(beziers):
+        ax.plot(*to_coordinate(b()), alpha=1, lw=5, color=b.color, zorder=1)  # 'C'+str(i))
+
+    ax.plot(*to_coordinate(waypoints), alpha=1, lw=5, color='green', zorder=2)
+
+    x, y = waypoint
+    ax.scatter([-y], [x], color='red', zorder=3)
+
+    plt.axis('scaled')
+
+    return plt2img()
 
 
 def fig2data(fig):

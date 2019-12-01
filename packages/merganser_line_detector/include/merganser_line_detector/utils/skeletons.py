@@ -7,12 +7,12 @@ from duckietown_msgs.msg import Vector2D
 def skeleton_to_msg(skeleton, color, original_image_size, top_cutoff=0):
     y_indices, x_indices = skeleton
 
-    y_float = y_indices.astype(np.float32)
     x_float = x_indices.astype(np.float32)
+    y_float = y_indices.astype(np.float32)
 
     # Normalize the indices in [0, 1]
     y_float = 1 - (y_float + top_cutoff) / (original_image_size[0] - 1)
-    x_float = x_float / (original_image_size[1] - 1)
+    x_float = 1 - x_float / (original_image_size[1] - 1)
 
     cloud = []
     for y, x in zip(y_float, x_float):

@@ -7,7 +7,7 @@ import time
 from merganser_bezier.bezier import Bezier, compute_curve
 from merganser_bezier.utils.plots import plot_fitted_skeleton
 from merganser_msgs.msg import BezierMsg, SkeletonMsg, SkeletonsMsg, BeziersMsg
-from duckietown_msgs.msg import Vector2D
+from duckietown_msgs.msg import Vector2D, Twist2DStamped
 
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
@@ -25,7 +25,7 @@ class BezierNode(object):
         # Parameters
         self.verbose = False
         self.refit_every = 1
-        self.loss_threshold = .1
+        self.loss_threshold = .01
         self.reg = 5e-3
         self.lr = .1
         self.extension = .1
@@ -40,6 +40,18 @@ class BezierNode(object):
             self.process_skeletons,
             queue_size=1
         )
+
+        self.sub_commands = rospy.Subscriber(
+            '~command',
+            Twist2DStamped,
+            self.update_commands,
+            queue_size=1
+        )
+
+        self.dx = 0
+        self.dtheta = 0
+
+        self.t = time.time()
 
         # Publishers
         self.pub_bezier = rospy.Publisher('~beziers', BeziersMsg, queue_size=1)
@@ -63,64 +75,30 @@ class BezierNode(object):
         self.verbose = rospy.get_param('~verbose', False)
 
         self.refit_every = rospy.get_param('~refit_every', 1)
-        self.intermittent_interval = rospy.get_param('~intermittent_interval', 10)
+        self.intermittent_interval = rospy.get_param('~intermittent_interval', 100)
 
-        self.loss_threshold = rospy.get_param('~loss_threshold', 1e-3)
+        self.loss_threshold = rospy.get_param('~loss_threshold', 1e-9)
 
-        self.extension = rospy.get_param('~extension', 1e-2)
+        self.extension = rospy.get_param('~extension', 0)
 
-        self.curve_precision = rospy.get_param('~curve_precision', 15)
+        self.curve_precision = rospy.get_param('~curve_precision', 20)
         self.fitting_steps = rospy.get_param('~fitting_steps', 200)
 
         self.eps = rospy.get_param('~eps', 1e-3)
         self.lr = rospy.get_param('~lr', 1e-2)
         self.reg = rospy.get_param('~reg', 1e-2)
 
-    def test_messages(self, event=None):
+    @property
+    def dt(self):
+        t = time.time()
+        dt = t - self.t
+        self.t = t
+        return dt
 
-        skeletons = SkeletonsMsg()
-
-        controls = np.array([
-            [.2, .4],
-            [.4, .2],
-            [.6, .8],
-            [.8, .2],
-        ])
-
-        curve = compute_curve(controls)
-        cloud = np.random.normal(size=curve.shape) * .1 + curve
-
-        skeleton = SkeletonMsg()
-        skeleton.color = skeleton.WHITE
-
-        for i, (x, y) in enumerate(cloud):
-            v = Vector2D()
-            v.x, v.y = x, y
-            skeleton.cloud.append(v)
-
-        skeletons.skeletons.append(skeleton)
-
-        controls = np.array([
-            [.4, .2],
-            [.2, .4],
-            [.8, .6],
-            [.2, .8],
-        ])
-
-        curve = compute_curve(controls)
-        cloud = np.random.normal(size=curve.shape) * .1 + curve
-
-        skeleton = SkeletonMsg()
-        skeleton.color = skeleton.WHITE
-
-        for i, (x, y) in enumerate(cloud):
-            v = Vector2D()
-            v.x, v.y = x, y
-            skeleton.cloud.append(v)
-
-        skeletons.skeletons.append(skeleton)
-
-        self.pub_skeletons.publish(skeletons)
+    def update_commands(self, msg):
+        v, omega = msg.v, msg.omega
+        self.dx = v * self.dt
+        self.dtheta = omega * self.dt
 
     def loginfo(self, message):
         rospy.loginfo('[%s] %s' % (self.node_name, message))
@@ -131,6 +109,7 @@ class BezierNode(object):
 
     def _extract_skeleton(self, skeleton):
         cloud = np.array([[point.x, point.y] for point in skeleton.cloud])
+        # print('Bez', sum([p.x for p in skeleton.cloud]) / len(skeleton.cloud))
         color = skeleton.color
 
         return cloud, color
@@ -139,20 +118,18 @@ class BezierNode(object):
 
         cloud, color = self._extract_skeleton(skeleton)
 
-        losses = np.array([b.loss(cloud) for b in self.beziers])
+        for bezier in self.beziers:
+            bezier.predict(self.dx, self.dtheta)
+
+        losses = np.array([b.loss(cloud) for b in self.beziers if b.color == color])
         argmin = losses.argmin() if len(losses) > 0 else -1
 
         if argmin > -1 and losses[argmin] < self.loss_threshold:
             bezier = self.beziers[argmin].copy()
+            bezier.correct(cloud)
         else:
-            bezier = Bezier(4, self.curve_precision, choice=cloud, reg=self.reg)
-
-        bezier.fit(
-            cloud=cloud,
-            steps=self.fitting_steps,
-            eps=self.eps,
-            lr=self.lr,
-        )
+            bezier = Bezier(4, self.curve_precision, reg=self.reg, color=color)
+            bezier.collapse(cloud)
 
         return bezier, color
 

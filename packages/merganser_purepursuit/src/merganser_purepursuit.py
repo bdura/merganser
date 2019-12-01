@@ -23,7 +23,7 @@ class PurePursuitNode(object):
     def __init__(self):
         self.node_name = "PurePursuit Node"
 
-        self.v0 = .5
+        self.v0 = .1
 
         # Subscriber
         self.sub_waypoint = rospy.Subscriber('~waypoint', Point, self.process_waypoint)

@@ -2,111 +2,92 @@ from copy import deepcopy
 
 import autograd.numpy as np
 from autograd import grad
-from scipy.special import comb
 
 from .utils.optimisers import adam
+from .utils.bernstein import get_bernstein, compute_curve, extrapolate
+
+from .kalman import KalmanFilter
 
 
-def memoize(func):
-    memory = dict()
-
-    def f(*args):
-        key = str(args)
-        if key not in memory:
-            memory[key] = func(*args)
-        return memory[key]
-
-    return f
-
-
-def bernstein(t, n):
-    """
-    Computes the Bernstein coefficient of a `n`-th order Bezier curve for a given `t`.
-
-    Parameters
-    ----------
-    t: float
-        The ratio to evaluate.
-    n: int
-        The order of the Bezier curve.
-
-    Returns
-    -------
-    b: np.array
-        A `n`-dimensional array.
-    """
-    return np.array([
-        comb(n - 1, i) * ((1 - t) ** (n - 1 - i)) * (t ** i)
-        for i in range(n)
-    ])
-
-
-def compute(t, controls):
-    n = len(controls)
-    b = bernstein(t, n)
-
-    return np.matmul(b, controls)
-
-
-@memoize
-def get_bernstein(precision=100, order=4):
-    ts = np.linspace(0, 1, precision)
-    return np.asarray([bernstein(t, order) for t in ts])
-
-
-def compute_curve(controls, n=100, order=4):
-    b = get_bernstein(n, order)
-    return np.matmul(b, controls)
+COLORS = {
+    0: 'white',
+    1: 'yellow',
+    2: 'red',
+    -1: 'gray'
+}
 
 
 class Bezier(object):
 
-    def __init__(self, order, precision, reg=5e-3, choice=None):
+    def __init__(self, order, precision, reg=5e-3, process_noise=.01, loss_threshold=.001, color=-1):
         super(Bezier, self).__init__()
 
-        ts = np.linspace(0, 1, precision)
-        self.bernstein = np.array([bernstein(t, order) for t in ts])
+        self.bernstein = get_bernstein(precision=precision, order=order)
 
-        if choice is None or len(choice) < order:
-            controls = np.random.normal(size=(order, 2))
-        else:
-            x_argmin, x_argmax = choice[:, 0].argmin(), choice[:, 0].argmax()
-            y_argmin, y_argmax = choice[:, 1].argmin(), choice[:, 1].argmax()
-
-            x_norm = ((choice[x_argmax] - choice[x_argmin]) ** 2).sum()
-            y_norm = ((choice[y_argmax] - choice[y_argmin]) ** 2).sum()
-
-            if x_norm > y_norm:
-                argmin, argmax = x_argmin, x_argmax
-            else:
-                argmin, argmax = y_argmin, y_argmax
-
-            controls = choice[[argmin]] + (choice[[argmax]] - choice[[argmin]]) * np.linspace(0, 1, 4).reshape(-1, 1)
-
-        self.controls = controls
+        self.controls = np.empty((order, 2))
 
         self.cloud = None
         self.reg = reg
 
-    @classmethod
-    def from_controls(cls, controls, precision=10):
-        bezier = Bezier(4, precision)
-        bezier.controls = controls
-        return bezier
+        self.loss_threshold = loss_threshold
+        self.filter = KalmanFilter(dimension=order, process_noise=process_noise)
+
+        self.color = COLORS[color]
+
+    def initialise(self, cloud):
+
+        order = len(self.controls)
+
+        if cloud is None:
+            self.controls = np.random.normal(size=(order, 2))
+        else:
+
+            n = len(cloud) // order + (len(cloud) % order > 0)
+
+            x_args = cloud[:, 0].argsort()
+            x_controls = np.array([
+                cloud[x_args[i * n:(i + 1) * n]].mean(axis=0)
+                for i in range(order)]
+            )
+
+            self.controls = x_controls
+            x_loss = self.loss(cloud)
+
+            y_args = cloud[:, 1].argsort()
+            y_controls = np.array([
+                cloud[y_args[i * n:(i + 1) * n]].mean(axis=0)
+                for i in range(order)]
+            )
+
+            self.controls = y_controls
+            y_loss = self.loss(cloud)
+
+            if y_loss > x_loss:
+                self.controls = x_controls
+
+            self.extrapolate(-.1, 1.1)
 
     def __call__(self):
         return np.matmul(self.bernstein, self.controls)
 
-    def nll(self, cloud):
+    @classmethod
+    def from_controls(cls, controls, precision=10, **kwargs):
+        bezier = Bezier(4, precision, **kwargs)
+        bezier.controls = controls
+        return bezier
+
+    def squared_error(self, cloud):
         curve = self()
         diff = curve.reshape(-1, 1, 2) - cloud.reshape(1, -1, 2)
         se = (diff ** 2).sum(axis=2)
+        return se
+
+    def nll(self, cloud):
+        se = self.squared_error(cloud)
         return se.min(axis=0).sum()
 
     def closed_form(self, cloud):
-        curve = self()
-        diff = curve.reshape(-1, 1, 2) - cloud.reshape(1, -1, 2)
-        se = (diff ** 2).mean(axis=2)
+        se = self.squared_error(cloud)
 
         argmin = se.argmin(axis=0)
 
@@ -142,12 +123,44 @@ class Bezier(object):
         gradient = grad(objective)
         self.controls = adam(gradient, self.controls, step_size=lr, num_iters=steps, threshold=eps)
 
+    def collapse(self, cloud):
+        self.initialise(cloud)
+        self.fit(
+            cloud=cloud,
+            steps=200,
+            eps=.001,
+            lr=.005,
+        )
+        self.filter.reset(self.controls)
+
+    def kalman(self, dx, dtheta, cloud):
+        self.filter.fit(dx, dtheta, cloud)
+        self.controls = self.filter.mu.reshape((len(self.controls), 2))
+
+    def predict(self, dx, dtheta):
+        self.filter.predict(dx, dtheta)
+        self.controls = self.filter.mu.reshape((len(self.controls), 2))
+
+    def correct(self, cloud):
+        self.filter.correct(cloud)
+        self.controls = self.filter.mu.reshape((len(self.controls), 2))
+
+        if self.loss(cloud) > self.loss_threshold:
+            self.collapse(cloud)
+
+    def step(self, dx, dtheta, cloud):
+
+        self.kalman(dx, dtheta, cloud)
+
+        if self.loss(cloud) > self.loss_threshold:
+            self.collapse(cloud)
+
     def derivative(self):
         n = len(self.controls)
         c0, cn = self.controls[:-1], self.controls[1:]
 
         c = n * (cn - c0)
-        d = compute_curve(c, len(self.bernstein), order=3)
+        d = compute_curve(c, len(self.bernstein))
 
         return d
 
@@ -165,92 +178,3 @@ class Bezier(object):
     def copy(self):
         new = deepcopy(self)
         return new
-
-
-def de_casteljau(controls, t, left=None, right=None):
-    """
-    Implements de Casteljau's algorithm to obtain the point at parameter value `t`.
-
-    It also provides the control points for the split Bezier curve
-    (if provided the two corresponding lists, which are populated).
-
-    Parameters
-    ----------
-    controls: np.array
-        The control points of the Bezier curve.
-    t: float
-        The parameter value to compute/on which to split.
-    left: list, optional
-        A python list to be populated with the new control points.
-    right: list, optional
-        A python list to be populated with the new control points.
-
-    Returns
-    -------
-    np.array
-        The point of the curve corresponding to parameter value t.
-    """
-    n = len(controls)
-
-    memory = left is not None and right is not None
-
-    if n == 1:
-        anchor = controls[0]
-        if memory:
-            left.append(anchor)
-            right.append(anchor)
-        return anchor
-    else:
-        left_anchors = controls[:n - 1]
-        right_anchors = controls[1:]
-
-        new_anchors = (1 - t) * left_anchors + t * right_anchors
-
-        if memory:
-            left.append(controls[0])
-            right.append(controls[-1])
-
-        return de_casteljau(new_anchors, t, left, right)
-
-
-def split(controls, t):
-    """
-    Splits a Bezier curve around the parameter value t.
-
-    Parameters
-    ----------
-    controls: np.array
-        The control points of the Bezier curve.
-    t: float
-        The parameter value to compute/on which to split.
-
-    Returns
-    -------
-    tuple(np.array)
-        The new control points.
-    """
-    left, right = [], []
-    de_casteljau(controls, t, left, right)
-    return np.asarray(left), np.asarray(right)
-
-
-def extrapolate(controls, t0, t1):
-    """
-    Computes the new control points that "extrapolate" the Bezier curve from `t0` to `t1`.
-
-    Parameters
-    ----------
-    controls: np.array
-        The control points of the Bezier curve.
-    t0, t1: float
-        The parameter values to extrapolate between.
-
-    Returns
-    -------
-    new: np.array
-        The new control points.
-    """
-    assert t0 < t1
-    left, right = split(controls, t0)
-    new, _ = split(right[::-1], t1)
-    return new
