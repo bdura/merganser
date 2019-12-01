@@ -21,8 +21,8 @@
 
     <group>
         <remap from="merganser_line_detector_node/corrected_image/compressed" to="anti_instagram_node/corrected_image/compressed"/>
-        <remap from="merganser_line_detector_node/skeletons" to="merganser_ground_projection/skeleton_in"/>
-        <remap from="merganser_ground_projection/skeleton_out" to="merganser_bezier_node/skeletons"/>
+        <remap from="merganser_line_detector_node/skeletons" to="merganser_ground_projection_node/skeleton_in"/>
+        <remap from="merganser_ground_projection_node/skeleton_out" to="merganser_bezier_node/skeletons"/>
 
         <remap from="merganser_bezier_node/beziers" to="merganser_trajectory/beziers"/>
         <remap from="merganser_trajectory/waypoint" to="merganser_purepursuit/waypoint"/>
@@ -37,7 +37,7 @@
             <arg name="verbose" value="$(arg verbose)" />
         </include>
 
-        <include file="$(find merganser_ground_projection)/launch/ground_projection.launch">
+        <include file="$(find merganser_ground_projection)/launch/merganser_ground_projection_node.launch">
             <arg name="veh" value="$(arg veh)"/>
         </include>
 

@@ -49,13 +49,13 @@ def compute(t, controls):
 
 
 @memoize
-def get_bernstein(precision=100):
+def get_bernstein(precision=100, order=4):
     ts = np.linspace(0, 1, precision)
-    return np.asarray([bernstein(t, 4) for t in ts])
+    return np.asarray([bernstein(t, order) for t in ts])
 
 
-def compute_curve(controls, n=100):
-    b = get_bernstein(n)
+def compute_curve(controls, n=100, order=4):
+    b = get_bernstein(n, order)
     return np.matmul(b, controls)
 
 
@@ -147,7 +147,7 @@ class Bezier(object):
         c0, cn = self.controls[:-1], self.controls[1:]
 
         c = n * (cn - c0)
-        d = compute_curve(c, len(self.bernstein))
+        d = compute_curve(c, len(self.bernstein), order=3)
 
         return d
 
