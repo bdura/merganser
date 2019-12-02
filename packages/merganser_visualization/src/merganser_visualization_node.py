@@ -54,6 +54,7 @@ class VisualizationNode(object):
 
     def callback_waypoint(self, waypoint_msg):
         point_msg = PointStamped()
+        point_msg.header.frame_id = self.veh_name
         point_msg.point = waypoint_msg
         self.pub_waypoint.publish(point_msg)
 
