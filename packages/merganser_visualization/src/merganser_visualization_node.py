@@ -6,7 +6,8 @@ import duckietown_utils as dtu
 from visualization_msgs.msg import MarkerArray
 
 from merganser_visualization.skeletons import skeletons_to_marker_array
-from merganser_msgs.msg import SkeletonsMsg
+from merganser_visualization.bezier import beziers_to_marker_array
+from merganser_msgs.msg import SkeletonsMsg, BeziersMsg
 
 
 class VisualizationNode(object):
@@ -20,11 +21,17 @@ class VisualizationNode(object):
         self.pub_skeletons = rospy.Publisher('~skeletons_markers',
                                              MarkerArray,
                                              queue_size=1)
+        self.pub_beziers = rospy.Publisher('~beziers_markers',
+                                           MarkerArray,
+                                           queue_size=1)
 
         # Subscribers
         self.sub_skeletons = rospy.Subscriber('~skeletons',
                                               SkeletonsMsg,
                                               self.callback_skeletons)
+        self.sub_beziers = rospy.Subscriber('~beziers',
+                                            BeziersMsg,
+                                            self.callback_beziers)
 
         self.loginfo('Initialized')
 
@@ -32,6 +39,11 @@ class VisualizationNode(object):
         marker_array = skeletons_to_marker_array(skeletons_msg,
                                                  veh_name=self.veh_name)
         self.pub_skeletons.publish(marker_array)
+
+    def callback_beziers(self, beziers_msg):
+        marker_array = beziers_to_marker_array(beziers_msg,
+                                               veh_name=self.veh_name)
+        self.pub_beziers.publish(marker_array)
 
     def loginfo(self, message):
         rospy.loginfo('[{0}] {1}'.format(self.node_name, message))

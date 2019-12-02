@@ -31,6 +31,7 @@
         <remap from="merganser_purepursuit/command" to="car_cmd_switch_node/cmd"/>
 
         <remap from="merganser_visualization_node/skeletons" to="merganser_ground_projection_node/skeleton_out"/>
+        <remap from="merganser_visualization_node/beziers" to="merganser_bezier_node/beziers"/>
 
         <include file="$(find merganser_line_detector)/launch/merganser_line_detector_node.launch">
             <arg name="veh" value="$(arg veh)"/>
