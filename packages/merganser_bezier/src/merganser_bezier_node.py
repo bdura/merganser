@@ -5,12 +5,8 @@ import rospy
 import numpy as np
 import time
 from merganser_bezier.bezier import Bezier, compute_curve
-from merganser_bezier.utils.plots import plot_fitted_skeleton
 from merganser_msgs.msg import BezierMsg, SkeletonMsg, SkeletonsMsg, BeziersMsg
 from duckietown_msgs.msg import Vector2D, Twist2DStamped
-
-from cv_bridge import CvBridge
-from sensor_msgs.msg import Image
 
 
 class BezierNode(object):
@@ -34,19 +30,15 @@ class BezierNode(object):
         self.eps = 1e-3
 
         # Subscribers
-        self.sub_skeleton = rospy.Subscriber(
-            '~skeletons',
-            SkeletonsMsg,
-            self.process_skeletons,
-            queue_size=1
-        )
+        self.sub_skeleton = rospy.Subscriber('~skeletons',
+                                             SkeletonsMsg,
+                                             self.process_skeletons,
+                                             queue_size=1)
 
-        self.sub_commands = rospy.Subscriber(
-            '~command',
-            Twist2DStamped,
-            self.update_commands,
-            queue_size=1
-        )
+        self.sub_commands = rospy.Subscriber('~command',
+                                             Twist2DStamped,
+                                             self.update_commands,
+                                             queue_size=1)
 
         self.dx = 0
         self.dtheta = 0
@@ -54,7 +46,9 @@ class BezierNode(object):
         self.t = time.time()
 
         # Publishers
-        self.pub_bezier = rospy.Publisher('~beziers', BeziersMsg, queue_size=1)
+        self.pub_bezier = rospy.Publisher('~beziers',
+                                          BeziersMsg,
+                                          queue_size=1)
 
         self.update_params(None)
 
@@ -67,9 +61,6 @@ class BezierNode(object):
 
         self.time = 0
         self.n = 0
-
-        self.bridge = CvBridge()
-        self.pub_skeletons_image = rospy.Publisher('~curves', Image, queue_size=1)
 
     def update_params(self, _event):
         self.verbose = rospy.get_param('~verbose', False)
@@ -170,12 +161,6 @@ class BezierNode(object):
             messages.beziers.append(msg)
 
         self.beziers = beziers
-
-        if self.verbose and self.intermittent_log_now():
-            img = plot_fitted_skeleton(beziers, skeletons)
-            img_message = self.bridge.cv2_to_imgmsg(img, 'bgr8')
-
-            self.pub_skeletons_image.publish(img_message)
 
         self.stats.processed()
         self.intermittent_counter += 1
