@@ -57,7 +57,7 @@
         </include>
 
         <include file="$(find merganser_visualization)/launch/merganser_visualization_node.launch">
-            <arg name="veh" value="$(arg veh)"/>
+            <arg name="veh_name" value="$(arg veh)"/>
             <arg name="verbose" value="$(arg verbose)"/>
         </include>
     </group>

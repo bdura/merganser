@@ -7,6 +7,7 @@
     <group ns="$(arg veh)">
         <node name="$(arg node_name)" pkg="$(arg pkg_name)" type="$(arg node_name).py" output="screen" required="true">
             <param name="verbose" value="$(arg verbose)"/>
+            <param name="veh_name" value="$(arg veh)"/>
         </node>
     </group>
 </launch>
