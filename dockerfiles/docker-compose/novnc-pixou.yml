@@ -1,0 +1,19 @@
+version: '3'
+services:
+    novnc-pixou:
+        image: duckietown/docker-ros-vnc:daffy
+        networks:
+        - duckietown-docker-net
+        environment:
+        - "ROS_MASTER_URI=http://pixou.local:11311"
+        - "HOSTNAME=pixou"
+        - "VEHICLE_NAME=pixou"
+        expose:
+        - "5901"
+        - "6901"
+        ports:
+        - "5901:5901"
+        - "6901:6901"
+
+networks:
+    duckietown-docker-net:
