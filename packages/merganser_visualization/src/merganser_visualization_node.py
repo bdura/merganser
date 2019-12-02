@@ -4,6 +4,7 @@ import rospy
 import duckietown_utils as dtu
 
 from visualization_msgs.msg import MarkerArray
+from geometry_msgs.msg import PointStamped, Point
 
 from merganser_visualization.skeletons import skeletons_to_marker_array
 from merganser_visualization.bezier import beziers_to_marker_array
@@ -24,6 +25,9 @@ class VisualizationNode(object):
         self.pub_beziers = rospy.Publisher('~beziers_markers',
                                            MarkerArray,
                                            queue_size=1)
+        self.pub_waypoint = rospy.Publisher('~waypoint_marker',
+                                            PointStamped,
+                                            queue_size=1)
 
         # Subscribers
         self.sub_skeletons = rospy.Subscriber('~skeletons',
@@ -32,6 +36,9 @@ class VisualizationNode(object):
         self.sub_beziers = rospy.Subscriber('~beziers',
                                             BeziersMsg,
                                             self.callback_beziers)
+        self.sub_waypoint = rospy.Subscriber('~waypoint',
+                                             Point,
+                                             self.callback_waypoint)
 
         self.loginfo('Initialized')
 
@@ -44,6 +51,11 @@ class VisualizationNode(object):
         marker_array = beziers_to_marker_array(beziers_msg,
                                                veh_name=self.veh_name)
         self.pub_beziers.publish(marker_array)
+
+    def callback_waypoint(self, waypoint_msg):
+        point_msg = PointStamped()
+        point_msg.point = waypoint_msg
+        self.pub_waypoint.publish(point_msg)
 
     def loginfo(self, message):
         rospy.loginfo('[{0}] {1}'.format(self.node_name, message))
