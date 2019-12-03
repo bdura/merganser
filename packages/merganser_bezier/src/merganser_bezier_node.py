@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 # import cv2
-import duckietown_utils as dtu
-import rospy
-import numpy as np
 import time
-from merganser_bezier.bezier import Bezier, compute_curve
-from merganser_bezier.utils.plots import plot_fitted_skeleton
-from merganser_msgs.msg import BezierMsg, SkeletonMsg, SkeletonsMsg, BeziersMsg
-from duckietown_msgs.msg import Vector2D, Twist2DStamped
 
+import numpy as np
+import rospy
 from cv_bridge import CvBridge
+from duckietown_msgs.msg import Twist2DStamped
+from merganser_bezier.bezier import Bezier
+from merganser_bezier.utils.plots import plot_fitted_skeleton
+from merganser_bezier.utils.skeletons import extract_skeleton, Color, make_bezier_message
+from merganser_msgs.msg import BezierMsg, SkeletonsMsg, BeziersMsg
 from sensor_msgs.msg import Image
 
 
@@ -45,18 +45,27 @@ class BezierNode(object):
 
         # Attributes
         self.steps = 0
-        self.beziers = []
+
+        self.left = Bezier()
+        self.yellow = Bezier()
+        self.right = Bezier()
+
+        self.beziers = [self.left, self.yellow, self.right]
 
         self.time = 0
         self.n = 0
 
         self.bridge = CvBridge()
 
+        # Publishers
+        self.pub_bezier = rospy.Publisher('~beziers', BeziersMsg, queue_size=1)
+        self.pub_skeletons_image = rospy.Publisher('~curves', Image, queue_size=1)
+
         # Subscribers
         self.sub_skeleton = rospy.Subscriber(
             '~skeletons',
             SkeletonsMsg,
-            self.process_skeletons,
+            self.process,
             queue_size=1
         )
 
@@ -66,10 +75,6 @@ class BezierNode(object):
             self.update_commands,
             queue_size=1
         )
-
-        # Publishers
-        self.pub_bezier = rospy.Publisher('~beziers', BeziersMsg, queue_size=1)
-        self.pub_skeletons_image = rospy.Publisher('~curves', Image, queue_size=1)
 
     def update_params(self, _event):
         self.verbose = rospy.get_param('~verbose', False)
@@ -104,75 +109,162 @@ class BezierNode(object):
         rospy.loginfo('[%s] %s' % (self.node_name, message))
 
     def _extend_beziers(self):
-        for bezier in self.beziers:
-            bezier.extrapolate(0 - self.extension, 1 + self.extension)
+        self.left.extrapolate(0 - self.extension, 1 + self.extension)
+        self.right.extrapolate(0 - self.extension, 1 + self.extension)
+        self.yellow.extrapolate(0 - self.extension, 1 + self.extension)
 
-    def _extract_skeleton(self, skeleton):
-        cloud = np.array([[point.x, point.y] for point in skeleton.cloud])
-        # print('Bez', sum([p.x for p in skeleton.cloud]) / len(skeleton.cloud))
-        color = skeleton.color
+    def _predict(self):
+        self.left.predict(self.dx, self.dtheta)
+        self.yellow.predict(self.dx, self.dtheta)
+        self.right.predict(self.dx, self.dtheta)
 
-        return cloud, color
-
-    def _process_skeleton(self, skeleton):
-
-        cloud, color = self._extract_skeleton(skeleton)
-
-        for bezier in self.beziers:
-            bezier.predict(self.dx, self.dtheta)
-
-        losses = np.array([b.loss(cloud) for b in self.beziers if b.color == color])
-        argmin = losses.argmin() if len(losses) > 0 else -1
-
-        if argmin > -1 and losses[argmin] < self.loss_threshold:
-            bezier = self.beziers[argmin].copy()
-            bezier.correct(cloud)
+    def _process_yellows(self, yellows):
+        if len(yellows) == 0:
+            self.yellow.unfit()
         else:
-            bezier = Bezier(4, self.curve_precision, reg=self.reg, color=color)
-            bezier.collapse(cloud)
+            cloud = np.vstack(yellows)
+            self.yellow.correct(cloud)
 
-        return bezier, color
+    def _process_whites(self, whites):
 
-    def _make_bezier_message(self, bezier, color):
-        msg = BezierMsg()
-        msg.color = color
-        for i, c in enumerate(bezier.controls):
-            msg.controls[i].x = c[0]
-            msg.controls[i].y = c[1]
-        return msg
+        if len(whites) == 0:
+            self.left.unfit()
+            self.right.unfit()
+            return
 
-    def process_skeletons(self, skeletons_msg):
+        # Computes the centroids
+        centroids = np.array([w.mean(axis=0) for w in whites])
+
+        if self.yellow.fitted:
+            # If the yellow line is already fitted, it becomes simple to differentiate left from right
+
+            center = self.yellow.controls.mean(axis=0)
+            normal = self.yellow.normal().mean(axis=0)
+
+            dot_product = np.dot(centroids - center, normal)
+
+            lefts = [w for w, d in zip(whites, dot_product) if d > 0.]
+            rights = [w for w, d in zip(whites, dot_product) if d < -0.]
+
+            lefts = sorted(lefts, key=lambda c: len(c), reverse=True)
+            rights = sorted(rights, key=lambda c: len(c), reverse=True)
+
+            left = lefts[0] if len(lefts) > 0 else None
+            right = rights[0] if len(rights) > 0 else None
+
+            if left is not None:
+                self.left.correct(left)
+            else:
+                self.left.unfit()
+
+            if right is not None:
+                self.right.correct(right)
+            else:
+                self.right.unfit()
+
+            return
+
+        loss = np.array([
+            [b.loss(cloud) for b in [self.left, self.right]]
+            for cloud in whites
+        ])
+
+        if self.left.fitted and self.right.fitted:
+
+            if len(whites) == 1:
+
+                arg = loss[0].argmin()
+                white = whites[0]
+                if arg == 0:
+                    self.left.correct(white)
+                    self.right.unfit()
+                else:
+                    self.right.correct(white)
+                    self.left.unfit()
+
+            else:
+
+                if len(loss) > 2:
+                    argsort = loss.min(axis=1).argsort()
+                    loss = loss[argsort[:2]]
+                    whites = whites[argsort[:2]]
+
+                lr_loss = loss.diagonal().sum()
+                rl_loss = loss.sum() - lr_loss
+
+                if lr_loss < rl_loss:
+                    left, right = whites
+                else:
+                    right, left = whites
+
+                self.left.correct(left)
+                self.right.correct(right)
+
+        elif self.left.fitted:
+            loss = loss[:, 0]
+
+            left = whites.pop(loss.argmin())
+            self.left.correct(left)
+
+            # if len(whites) == 0:
+            #     # It is already not fitted, but let's be explicit
+            #     self.right.unfit()
+            # else:
+            #     centroids = np.array([w.mean(axis=0) for w in whites])
+            #     dot_product = np.dot(centroids - left.mean(axis=0), - self.left.normal().mean(axis=0))
+            #     arg = dot_product.argmax()
+            #
+            #     right = whites[arg]
+            #     self.right.correct(right)
+
+        elif self.right.fitted:
+            loss = loss[:, 1]
+
+            right = whites.pop(loss.argmin())
+            self.right.correct(right)
+
+            # if len(whites) == 0:
+            #     # It is already not fitted, but let's be explicit
+            #     self.left.unfit()
+            # else:
+            #     centroids = np.array([w.mean(axis=0) for w in whites])
+            #     dot_product = np.dot(centroids - right.mean(axis=0), + self.right.normal().mean(axis=0))
+            #     arg = dot_product.argmax()
+            #
+            #     left = whites[arg]
+            #     self.left.correct(left)
+
+        else:
+            # Otherwise we're screwed. Let's continue and hope for the best
+            # ie that we'll see a yellow line at some point
+            self.left.unfit()
+            self.right.unfit()
+
+    def process(self, skeletons_msg):
 
         t0 = time.time()
 
         self.stats.received()
 
-        # Extends all collected Bezier curves
+        # Predicts and extends the bezier curves
+        self._predict()
         self._extend_beziers()
 
         # Gets the skeletons
         skeletons = skeletons_msg.skeletons
+        skeletons = [extract_skeleton(s) for s in skeletons]
 
-        # Creates the message containing the updated Bezier curves
-        beziers = []
-        messages = BeziersMsg()
+        yellows = [s for s, c in skeletons if c == Color.yellow]
+        whites = [s for s, c in skeletons if c == Color.white]
 
-        # Removes scattered skeletons
-        skeletons = [skeleton for skeleton in skeletons if len(skeleton.cloud) > 10]
+        # Process the yellow line first
+        self._process_yellows(yellows)
 
-        for skeleton in skeletons:
-
-            bezier, color = self._process_skeleton(skeleton)
-            beziers.append(bezier)
-
-            # Creates the message associated with the bezier curve and appends it to the general message
-            msg = self._make_bezier_message(bezier, color)
-            messages.beziers.append(msg)
-
-        self.beziers = beziers
+        # Then move on to the white lines
+        self._process_whites(whites)
 
         if self.verbose and self.intermittent_log_now():
-            img = plot_fitted_skeleton(beziers, skeletons)
+            img = plot_fitted_skeleton([b for b in self.beziers if b.fitted], skeletons)
             img_message = self.bridge.cv2_to_imgmsg(img, 'bgr8')
 
             self.pub_skeletons_image.publish(img_message)
@@ -183,7 +275,12 @@ class BezierNode(object):
             self.intermittent_log(self.stats.info())
             self.stats.reset()
 
-        self.pub_bezier.publish(messages)
+        message = BeziersMsg()
+        message.left = make_bezier_message(self.left)
+        message.yellow = make_bezier_message(self.yellow)
+        message.right = make_bezier_message(self.right)
+
+        self.pub_bezier.publish(message)
 
         t = time.time() - t0
 

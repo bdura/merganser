@@ -1,13 +1,12 @@
 from copy import deepcopy
+from enum import Enum
 
 import autograd.numpy as np
 from autograd import grad
 
-from .utils.optimisers import adam
-from .utils.bernstein import get_bernstein, compute_curve, extrapolate
-
 from .kalman import KalmanFilter
-
+from .utils.bernstein import get_bernstein, compute_curve, extrapolate
+from .utils.optimisers import adam
 
 COLORS = {
     0: 'white',
@@ -17,9 +16,19 @@ COLORS = {
 }
 
 
+class CurveType(Enum):
+    left = 'white'
+    yellow = 'yellow'
+    right = 'right'
+    red = 'red'
+
+    default = 'gray'
+
+
 class Bezier(object):
 
-    def __init__(self, order, precision, reg=5e-3, process_noise=.01, loss_threshold=.001, color=-1):
+    def __init__(self, order, precision, reg=5e-3, process_noise=.01, loss_threshold=.001, color=-1,
+                 curve_type='default'):
         super(Bezier, self).__init__()
 
         self.bernstein = get_bernstein(precision=precision, order=order)
@@ -32,7 +41,10 @@ class Bezier(object):
         self.loss_threshold = loss_threshold
         self.filter = KalmanFilter(dimension=order, process_noise=process_noise)
 
-        self.color = COLORS[color]
+        self.type = CurveType[curve_type]
+        self.color = color
+
+        self.fitted = False
 
     def initialise(self, cloud):
 
@@ -132,6 +144,7 @@ class Bezier(object):
             lr=.005,
         )
         self.filter.reset(self.controls)
+        self.fitted = True
 
     def kalman(self, dx, dtheta, cloud):
         self.filter.fit(dx, dtheta, cloud)
@@ -147,6 +160,8 @@ class Bezier(object):
 
         if self.loss(cloud) > self.loss_threshold:
             self.collapse(cloud)
+
+        self.fitted = True
 
     def step(self, dx, dtheta, cloud):
 
@@ -171,10 +186,13 @@ class Bezier(object):
         # Normalises the derivative
         d = d / np.linalg.norm(d, axis=1, keepdims=True)
 
-        rot = np.array([[0, 1], [-1, 0]])
+        rot = np.array([[0, -1], [1, 0]])
 
         return np.matmul(rot, d.T).T
 
     def copy(self):
         new = deepcopy(self)
         return new
+
+    def unfit(self):
+        self.fitted = False
