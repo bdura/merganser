@@ -16,14 +16,14 @@ class PurePursuitNode(object):
         self.loginfo('Initializing...')
 
         # Publishers
-        self.pub_car_cmd = rospy.Publisher('~car_cmd'
+        self.pub_car_cmd = rospy.Publisher('~car_cmd',
                                            Twist2DStamped,
                                            queue_size=1)
 
         # Subscribers
         self.sub_skeletons = rospy.Subscriber('~skeletons',
                                               SkeletonsMsg,
-                                              self.update_cmd
+                                              self.update_cmd,
                                               queue_size=1)
 
         # Maximal velocity
@@ -89,7 +89,7 @@ class PurePursuitNode(object):
 
     def on_shutdown(self):
         self.sub_skeletons.unregister()
-        self.publish_cmd(0., 0.)
+        self.publish_cmd(Velocities(v=0., omega=0.))
 
         rospy.sleep(0.5)
         self.loginfo('Shutting down')
