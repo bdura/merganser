@@ -1,1 +1,3 @@
-merganser_msgs/BezierMsg[] beziers
+merganser_msgs/BezierMsg left
+merganser_msgs/BezierMsg yellow
+merganser_msgs/BezierMsg right
