@@ -36,7 +36,7 @@ class PurePursuitNode(object):
 
     def update_params(self, _event):
 
-        self.v0 = rospy.get_param('~v0', False)
+        self.v0 = rospy.get_param('~v0', .0)
 
     def process_waypoint(self, point):
         x, y = point.x, point.y
@@ -49,6 +49,8 @@ class PurePursuitNode(object):
         self.publish_command(v, omega)
 
     def publish_command(self, v, omega):
+        if v == 0.:
+            return
         message = Twist2DStamped()
         message.v = v
         message.omega = omega
