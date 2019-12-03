@@ -6,6 +6,7 @@ import numpy as np
 import time
 from merganser_bezier.bezier import Bezier, compute_curve
 from merganser_bezier.utils.plots import plot_fitted_skeleton
+from merganser_bezier.utils.skeletons import get_white_clouds, get_yellow_cloud
 from merganser_msgs.msg import BezierMsg, SkeletonMsg, SkeletonsMsg, BeziersMsg
 from duckietown_msgs.msg import Vector2D, Twist2DStamped
 
@@ -114,10 +115,7 @@ class BezierNode(object):
 
         return cloud, color
 
-    def _process_skeleton(self, skeleton):
-
-        cloud, color = self._extract_skeleton(skeleton)
-
+    def _process_cloud(self, cloud, color):
         for bezier in self.beziers:
             bezier.predict(self.dx, self.dtheta)
 
@@ -131,7 +129,7 @@ class BezierNode(object):
             bezier = Bezier(4, self.curve_precision, reg=self.reg, color=color)
             bezier.collapse(cloud)
 
-        return bezier, color
+        return bezier
 
     def _make_bezier_message(self, bezier, color):
         msg = BezierMsg()
@@ -160,13 +158,21 @@ class BezierNode(object):
         # Removes scattered skeletons
         skeletons = [skeleton for skeleton in skeletons if len(skeleton.cloud) > 10]
 
-        for skeleton in skeletons:
-
-            bezier, color = self._process_skeleton(skeleton)
+        # Get white clouds
+        white_clouds = get_white_clouds(skeletons)
+        for white_cloud in white_clouds:
+            bezier = self._process_cloud(white_cloud, color=SkeletonMsg.WHITE)
             beziers.append(bezier)
 
-            # Creates the message associated with the bezier curve and appends it to the general message
-            msg = self._make_bezier_message(bezier, color)
+            msg = self._make_bezier_message(bezier, SkeletonMsg.WHITE)
+            messages.beziers.append(msg)
+
+        # Get yellow cloud (as a single cloud)
+        yellow_cloud = get_yellow_cloud(skeletons)
+        if yellow_cloud is not None:
+            bezier = self._process_cloud(yellow_cloud, color=SkeletonMsg.YELLOW)
+
+            msg = self._make_bezier_message(bezier, SkeletonMsg.YELLOW)
             messages.beziers.append(msg)
 
         self.beziers = beziers

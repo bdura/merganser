@@ -153,9 +153,9 @@ class TrajectoryNode(object):
             # waypoints = Bezier.from_controls((yellow.controls + right.controls) / 2, color='green')()
             waypoints = (yellow() + right()) / 2
         elif yellow is not None:
-            waypoints = yellow() - self.correction * yellow.normal()
+            waypoints = yellow() + self.correction * yellow.normal()
         elif right is not None:
-            waypoints = right() + self.correction * right.normal()
+            waypoints = right() - self.correction * right.normal()
         else:
             waypoints = None
 
