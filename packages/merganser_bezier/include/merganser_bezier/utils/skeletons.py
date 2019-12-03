@@ -27,7 +27,7 @@ def make_bezier_message(bezier):
         msg.fitted = 1
         controls = bezier.controls
 
-    for i, c in enumerate(bezier.controls):
+    for i, c in enumerate(controls):
         msg.controls[i].x = c[0]
         msg.controls[i].y = c[1]
     return msg
