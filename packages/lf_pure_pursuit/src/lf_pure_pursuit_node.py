@@ -15,19 +15,6 @@ class PurePursuitNode(object):
         self.node_name = rospy.get_name()
         self.loginfo('Initializing...')
 
-        self.previous = Velocities(v=self.v_max, omega=0.)
-
-        # Publishers
-        self.pub_car_cmd = rospy.Publisher('~car_cmd',
-                                           Twist2DStamped,
-                                           queue_size=1)
-
-        # Subscribers
-        self.sub_skeletons = rospy.Subscriber('~skeletons',
-                                              SkeletonsMsg,
-                                              self.update_cmd,
-                                              queue_size=1)
-
         # Maximal velocity
         v_bar_fallback = 0.25
         self.v_max = self.setup_parameter('~v_max', v_bar_fallback)
@@ -59,6 +46,19 @@ class PurePursuitNode(object):
         decay_rate_fallback = 0.9
         self.decay_rate = self.setup_parameter('~decay_rate', decay_rate_fallback)
 
+        self.previous = Velocities(v=self.v_max, omega=0.)
+
+        # Publishers
+        self.pub_car_cmd = rospy.Publisher('~car_cmd',
+                                           Twist2DStamped,
+                                           queue_size=1)
+
+        # Subscribers
+        self.sub_skeletons = rospy.Subscriber('~skeletons',
+                                              SkeletonsMsg,
+                                              self.update_cmd,
+                                              queue_size=1)
+
         self.loginfo('Initialized')
 
     def update_cmd(self, skeletons_msg):
@@ -89,8 +89,8 @@ class PurePursuitNode(object):
         rospy.loginfo('[{0}] {1}'.format(self.node_name, message))
 
     def on_shutdown(self):
-        self.sub_skeletons.unregister()
         self.publish_cmd(Velocities(v=0., omega=0.))
+        self.sub_skeletons.unregister()
 
         rospy.sleep(0.5)
         self.loginfo('Shutting down')

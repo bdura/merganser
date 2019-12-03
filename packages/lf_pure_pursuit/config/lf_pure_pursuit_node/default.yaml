@@ -1,4 +1,4 @@
-v_max: 0.3
+v_max: 1.2
 look_ahead_distance: 0.2
 offset: 0.35
 sin_alpha_min: 0.1
