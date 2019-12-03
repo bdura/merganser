@@ -46,9 +46,9 @@ class BezierNode(object):
         # Attributes
         self.steps = 0
 
-        self.left = Bezier(4, 20)
-        self.yellow = Bezier(4, 20)
-        self.right = Bezier(4, 20)
+        self.left = Bezier(4, 20, color=0)
+        self.yellow = Bezier(4, 20, color=1)
+        self.right = Bezier(4, 20, color=0)
 
         self.beziers = [self.left, self.yellow, self.right]
 
