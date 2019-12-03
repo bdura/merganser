@@ -18,9 +18,15 @@ def extract_skeleton(skeleton):
 
 
 def make_bezier_message(bezier):
-    if not bezier.fitted:
-        return None
     msg = BezierMsg()
+
+    if not bezier.fitted:
+        msg.fitted = 0
+        controls = np.zeros((4, 2))
+    else:
+        msg.fitted = 1
+        controls = bezier.controls
+
     for i, c in enumerate(bezier.controls):
         msg.controls[i].x = c[0]
         msg.controls[i].y = c[1]
