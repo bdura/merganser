@@ -4,13 +4,16 @@ from enum import Enum
 import numpy as np
 import rospy
 from geometry_msgs.msg import Point
+from visualization_msgs.msg import Marker
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+
 from merganser_msgs.msg import BeziersMsg
 from merganser_bezier.bezier import Bezier, compute_curve
 from duckietown_msgs.msg import Vector2D, Twist2DStamped
 
 from merganser_bezier.utils.plots import plot_waypoint
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
+from merganser_visualization.general import line_to_marker, color_to_rgba
 
 import time
 
@@ -33,6 +36,7 @@ class TrajectoryNode(object):
     def __init__(self):
 
         self.node_name = "Trajectory Node"
+        self.veh_name = rospy.get_param('~veh', 'default')
 
         self.lookahead = 0.2
         self.correction = 0.2
@@ -58,6 +62,7 @@ class TrajectoryNode(object):
         # Publisher
         self.pub_waypoint = rospy.Publisher('~waypoint', Point, queue_size=1)
         self.pub_image = rospy.Publisher('~image', Image, queue_size=1)
+        self.pub_trajectory_marker = rospy.Publisher('~trajectory_marker', Marker, queue_size=1)
 
         # Subscriber
         self.sub_filtered_segments = rospy.Subscriber('~beziers', BeziersMsg, self.process_beziers)
@@ -74,6 +79,7 @@ class TrajectoryNode(object):
         self.lookahead = rospy.get_param('~lookahead', .3)
         self.correction = rospy.get_param('~correction', .1)
         self.alpha = rospy.get_param('~alpha', .8)
+        self.veh_name = rospy.get_param('~veh', 'default')
 
         self.verbose = rospy.get_param('~verbose', False)
 
@@ -172,6 +178,12 @@ class TrajectoryNode(object):
 
             w = Point(self.waypoint[0], self.waypoint[1], 0)
             self.pub_waypoint.publish(w)
+
+            marker = line_to_marker(waypoints,
+                                    color_to_rgba('green'),
+                                    name='trajectory_curve',
+                                    veh_name=self.veh_name)
+            self.pub_trajectory_marker.publish(marker)
 
         self.iters += 1
 
