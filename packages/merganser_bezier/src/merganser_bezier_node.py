@@ -46,9 +46,9 @@ class BezierNode(object):
         # Attributes
         self.steps = 0
 
-        self.left = Bezier()
-        self.yellow = Bezier()
-        self.right = Bezier()
+        self.left = Bezier(4, 20)
+        self.yellow = Bezier(4, 20)
+        self.right = Bezier(4, 20)
 
         self.beziers = [self.left, self.yellow, self.right]
 
@@ -205,34 +205,14 @@ class BezierNode(object):
 
             left = whites.pop(loss.argmin())
             self.left.correct(left)
-
-            # if len(whites) == 0:
-            #     # It is already not fitted, but let's be explicit
-            #     self.right.unfit()
-            # else:
-            #     centroids = np.array([w.mean(axis=0) for w in whites])
-            #     dot_product = np.dot(centroids - left.mean(axis=0), - self.left.normal().mean(axis=0))
-            #     arg = dot_product.argmax()
-            #
-            #     right = whites[arg]
-            #     self.right.correct(right)
+            self.right.unfit()
 
         elif self.right.fitted:
             loss = loss[:, 1]
 
             right = whites.pop(loss.argmin())
             self.right.correct(right)
-
-            # if len(whites) == 0:
-            #     # It is already not fitted, but let's be explicit
-            #     self.left.unfit()
-            # else:
-            #     centroids = np.array([w.mean(axis=0) for w in whites])
-            #     dot_product = np.dot(centroids - right.mean(axis=0), + self.right.normal().mean(axis=0))
-            #     arg = dot_product.argmax()
-            #
-            #     left = whites[arg]
-            #     self.left.correct(left)
+            self.left.unfit()
 
         else:
             # Otherwise we're screwed. Let's continue and hope for the best

@@ -5,7 +5,7 @@ from PIL import Image
 
 import io
 
-from .skeletons import _extract_skeleton
+from .skeletons import extract_skeleton
 
 
 def to_coordinate(coords):
@@ -37,7 +37,7 @@ def plot_fitted_skeleton(beziers, skeletons):
     ax.scatter([0], [0], color='white')
 
     for i, (b, s) in enumerate(zip(beziers, skeletons)):
-        c_, _ = _extract_skeleton(s)
+        c_, _ = extract_skeleton(s)
 
         ax.scatter(*to_coordinate(c_), alpha=.5, color=b.color)  # 'C' + str(i+1))
 
