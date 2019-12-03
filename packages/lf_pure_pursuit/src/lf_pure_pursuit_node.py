@@ -15,6 +15,8 @@ class PurePursuitNode(object):
         self.node_name = rospy.get_name()
         self.loginfo('Initializing...')
 
+        self.previous = Velocities(v=self.v_max, omega=0.)
+
         # Publishers
         self.pub_car_cmd = rospy.Publisher('~car_cmd',
                                            Twist2DStamped,
@@ -57,7 +59,6 @@ class PurePursuitNode(object):
         decay_rate_fallback = 0.9
         self.decay_rate = self.setup_parameter('~decay_rate', decay_rate_fallback)
 
-        self.previous = Velocities(v=self.v_max, omega=0.)
         self.loginfo('Initialized')
 
     def update_cmd(self, skeletons_msg):
