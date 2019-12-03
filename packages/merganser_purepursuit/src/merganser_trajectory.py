@@ -31,6 +31,15 @@ def rotation(theta):
     return r
 
 
+def get_bezier_curve(message):
+    if message is None:
+        return None
+    controls = message.controls
+    c = np.array([[p.x, p.y] for p in controls])
+    b = Bezier.from_controls(c)
+    return b
+
+
 class TrajectoryNode(object):
 
     def __init__(self):
@@ -95,95 +104,54 @@ class TrajectoryNode(object):
         self.t = t
         return dt
 
-    def get_bezier_curve(self, message):
-        controls, color = message.controls, message.color
+    def update_waypoint(self):
+        # Constructs the rotation matrix
+        r = rotation(- self.dtheta)
 
-        c = np.array([[p.x, p.y] for p in controls])
+        # Constructs the offset
+        offset = np.zeros(2)
+        offset[0] = - self.dx
 
-        # Flips the controls so the curve points outward
-        if c[0, 0] > c[-1, 0]:
-            c = c[[3, 2, 1, 0]]
-
-        b = Bezier.from_controls(c, color=color)
-
-        return b, color
+        self.waypoint = np.matmul(r, self.waypoint + offset)
 
     def process_beziers(self, message):
-        points = []
 
-        if len(message.beziers) == 0:
+        # Update waypoint using kinematics
+        self.update_waypoint()
+
+        left = get_bezier_curve(message.left)
+        yellow = get_bezier_curve(message.yellow)
+        right = get_bezier_curve(message.right)
+
+        if left is None and yellow is None and right is None:
             return
 
-        beziers = []
-
-        for m in message.beziers:
-            b, color = self.get_bezier_curve(m)
-
-            p = b()
-            n = b.normal()
-
-            if Color(color) == Color.WHITE:
-                points.append(p + self.correction * n)
-            elif Color(color) == Color.RED:
-                points.append(p - self.correction * n)
-
-            beziers.append(b)
-
-        yellows = [b for b in beziers if b.color == 'yellow']
-        whites = [b for b in beziers if b.color == 'white']
-
-        if len(yellows) > 0:
-            yellow = yellows[0]
-        else:
-            yellow = None
-
-        if len(whites) > 1:
-            whites = sorted(whites, key=lambda b: b.controls[:, 1].mean())
-            right, left = whites[0], whites[-1]
-        elif len(whites) == 1:
-            # If there is only one white line, we assume the one visible is on the right
-            # The hypothesis is that we need to cross the yellow line for this to be the case
-            right, left = whites[0], None
-        else:
-            right, left = None, None
-
-        if yellow is not None \
-                and right is not None \
-                and yellow.controls[:, 1].mean() > right.controls[:, 1].mean():
-            # waypoints = Bezier.from_controls((yellow.controls + right.controls) / 2, color='green')()
+        if yellow is not None and right is not None:
             waypoints = (yellow() + right()) / 2
+
         elif yellow is not None:
-            waypoints = yellow() - self.correction * yellow.normal()
+            waypoints = yellow() - self.correction * yellow.normal() * .9
+
         elif right is not None:
-            waypoints = right() + self.correction * right.normal()
+            waypoints = right() + self.correction * right.normal() * .9
+
         else:
-            waypoints = None
+            waypoints = left() - 2 * self.correction * right.normal() * .9
 
-        if waypoints is not None:
+        arg = np.abs(np.linalg.norm(waypoints, axis=1) - self.lookahead).argmin()
 
-            arg = np.abs(np.linalg.norm(waypoints, axis=1) - self.lookahead).argmin()
+        waypoint = waypoints[arg]
 
-            waypoint = waypoints[arg]
+        self.waypoint += self.alpha * (waypoint - self.waypoint)
 
-            # Constructs the rotation matrix
-            r = rotation(- self.dtheta)
+        w = Point(self.waypoint[0], self.waypoint[1], 0)
+        self.pub_waypoint.publish(w)
 
-            # Constructs the offset
-            offset = np.zeros(2)
-            offset[0] = - self.dx
-
-            self.waypoint = np.matmul(r, self.waypoint + offset)
-
-            self.waypoint += self.alpha * (waypoint - self.waypoint)
-
-            w = Point(self.waypoint[0], self.waypoint[1], 0)
-            self.pub_waypoint.publish(w)
-
-            marker = line_to_marker(waypoints,
-                                    color_to_rgba('green'),
-                                    name='trajectory_curve',
-                                    veh_name=self.veh_name)
-            self.pub_trajectory_marker.publish(marker)
+        marker = line_to_marker(waypoints,
+                                color_to_rgba('green'),
+                                name='trajectory_curve',
+                                veh_name=self.veh_name)
+        self.pub_trajectory_marker.publish(marker)
 
         self.iters += 1
 
