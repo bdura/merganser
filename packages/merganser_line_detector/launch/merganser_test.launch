@@ -1,28 +1,18 @@
 <launch>
     <arg name="veh" default="$(env VEHICLE_NAME)"/>
-    <arg name="ai_trafo_mode" default="cb" doc="'cb' for colo balance only; 'both' for color balance and linear trafo"/>
-    <arg name="ai_interval" default="5" doc="interval with which the linear trafo gets updated. color balance is performed every second."/>
-    <arg name="verbose" default="true"/>
-
-    <!-- start basic args -->
-    <include file="$(find duckietown_demos)/launch/master.launch">
-        <arg name="veh" value="$(arg veh)"/>
-        <arg name="visualization" default="true" />
-        <!--arg name="verbose" value="$(arg verbose)" /-->
-        <arg name="/camera/raw" default="true" />
-        <arg name="param_file_name" default="default" />
-        <arg name="line_detector_param_file_name" default="default" />
-        <arg name="anti_instagram" default="true" />
-        <arg name="ai_trafo_mode" value="$(arg ai_trafo_mode)"/>
-        <arg name="ai_interval" value="$(arg ai_interval)"/>
-        <arg name="/lane_following/stop_line_filter" default="false" />
-        <arg name="vehicle_avoidance" default="false"/>
-    </include>
+    <arg name="ai_trafo_mode" default="cb"
+         doc="'cb' for colo balance only; 'both' for color balance and linear trafo"/>
+    <arg name="ai_interval" default="5"
+         doc="interval with which the linear trafo gets updated. color balance is performed every second."/>
+    <arg name="verbose" default="false"/>
 
     <group>
-        <remap from="merganser_line_detector_node/corrected_image/compressed" to="anti_instagram_node/corrected_image/compressed"/>
-        <remap from="merganser_line_detector_node/skeletons" to="merganser_ground_projection_node/skeleton_in"/>
-        <remap from="merganser_bezier_node/skeletons" to="merganser_ground_projection_node/skeleton_out"/>
+        <remap from="merganser_line_detector_node/corrected_image/compressed"
+               to="anti_instagram_node/corrected_image/compressed"/>
+        <remap from="merganser_line_detector_node/skeletons"
+               to="merganser_ground_projection_node/skeleton_in"/>
+        <remap from="merganser_bezier_node/skeletons"
+               to="merganser_ground_projection_node/skeleton_out"/>
 
         <remap from="merganser_bezier_node/beziers" to="merganser_trajectory/beziers"/>
         <remap from="merganser_trajectory/waypoint" to="merganser_purepursuit/waypoint"/>
@@ -34,14 +24,19 @@
         <remap from="merganser_visualization_node/beziers" to="merganser_bezier_node/beziers"/>
         <remap from="merganser_visualization_node/waypoint" to="merganser_trajectory/waypoint"/>
 
+        <include file="$(find anti_instagram)/launch/anti_instagram_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="ai_interval" value="$(arg ai_interval)"/>
+        </include>
+
         <include file="$(find merganser_line_detector)/launch/merganser_line_detector_node.launch">
             <arg name="veh" value="$(arg veh)"/>
-            <arg name="verbose" value="$(arg verbose)" />
+            <arg name="verbose" value="$(arg verbose)"/>
         </include>
 
         <include file="$(find merganser_bezier)/launch/merganser_bezier_node.launch">
             <arg name="veh" value="$(arg veh)"/>
-            <arg name="verbose" value="$(arg verbose)" />
+            <arg name="verbose" value="$(arg verbose)"/>
         </include>
 
         <include file="$(find merganser_ground_projection)/launch/merganser_ground_projection_node.launch">

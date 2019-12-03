@@ -28,6 +28,8 @@ class TrajectoryNode(object):
         self.correction = 0.2
         self.alpha = 0.1
 
+        self.verbose = False
+
         self.iters = 0
 
         self.waypoint = np.zeros(2)
@@ -47,9 +49,11 @@ class TrajectoryNode(object):
 
     def update_params(self, _event=None):
 
-        self.lookahead = rospy.get_param('~lookahead', .5)
-        self.correction = rospy.get_param('~correction', .5)
-        self.alpha = rospy.get_param('~threshold', .2)
+        self.lookahead = rospy.get_param('~lookahead', .3)
+        self.correction = rospy.get_param('~correction', .1)
+        self.alpha = rospy.get_param('~alpha', .8)
+
+        self.verbose = rospy.get_param('~verbose', False)
 
     def get_bezier_curve(self, message):
         controls, color = message.controls, message.color
@@ -128,7 +132,7 @@ class TrajectoryNode(object):
 
         self.iters += 1
 
-        if self.iters % 10 == 0:
+        if self.verbose and self.iters % 10 == 0:
             img = plot_waypoint(beziers, self.waypoint, waypoints)
             img_message = self.bridge.cv2_to_imgmsg(img, 'bgr8')
 
