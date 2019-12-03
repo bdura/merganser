@@ -6,16 +6,26 @@ import rospy
 from geometry_msgs.msg import Point
 from merganser_msgs.msg import BeziersMsg
 from merganser_bezier.bezier import Bezier, compute_curve
+from duckietown_msgs.msg import Vector2D, Twist2DStamped
 
 from merganser_bezier.utils.plots import plot_waypoint
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+
+import time
 
 
 class Color(Enum):
     WHITE = 0
     YELLOW = 1
     RED = 2
+
+
+def rotation(theta):
+    cos, sin = np.cos(theta), np.sin(theta)
+    r = np.array([[cos, -sin],
+                  [sin, cos]])
+    return r
 
 
 class TrajectoryNode(object):
@@ -34,18 +44,27 @@ class TrajectoryNode(object):
 
         self.waypoint = np.zeros(2)
 
+        self.t = time.time()
+
         # Update the parameters
         self.update_params()
         rospy.Timer(rospy.Duration.from_sec(2.0), self.update_params)
-
-        # Subscriber
-        self.sub_filtered_segments = rospy.Subscriber('~beziers', BeziersMsg, self.process_beziers)
 
         self.bridge = CvBridge()
 
         # Publisher
         self.pub_waypoint = rospy.Publisher('~waypoint', Point, queue_size=1)
         self.pub_image = rospy.Publisher('~image', Image, queue_size=1)
+
+        # Subscriber
+        self.sub_filtered_segments = rospy.Subscriber('~beziers', BeziersMsg, self.process_beziers)
+
+        self.sub_commands = rospy.Subscriber(
+            '~command',
+            Twist2DStamped,
+            self.update_commands,
+            queue_size=1
+        )
 
     def update_params(self, _event=None):
 
@@ -54,6 +73,18 @@ class TrajectoryNode(object):
         self.alpha = rospy.get_param('~alpha', .8)
 
         self.verbose = rospy.get_param('~verbose', False)
+
+    def update_commands(self, msg):
+        v, omega = msg.v, msg.omega
+        self.dx = v * self.dt
+        self.dtheta = omega * self.dt
+
+    @property
+    def dt(self):
+        t = time.time()
+        dt = t - self.t
+        self.t = t
+        return dt
 
     def get_bezier_curve(self, message):
         controls, color = message.controls, message.color
@@ -124,6 +155,15 @@ class TrajectoryNode(object):
             arg = np.abs(np.linalg.norm(waypoints, axis=1) - self.lookahead).argmin()
 
             waypoint = waypoints[arg]
+
+            # Constructs the rotation matrix
+            r = rotation(- self.dtheta)
+
+            # Constructs the offset
+            offset = np.zeros(2)
+            offset[0] = - self.dx
+
+            self.waypoint = np.matmul(r, self.waypoint + offset)
 
             self.waypoint += self.alpha * (waypoint - self.waypoint)
 
