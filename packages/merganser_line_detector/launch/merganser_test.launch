@@ -5,55 +5,67 @@
     <arg name="ai_interval" default="5"
          doc="interval with which the linear trafo gets updated. color balance is performed every second."/>
     <arg name="verbose" default="false"/>
+    <arg name="param_file_name" default="default"/>
 
     <group>
-        <remap from="merganser_line_detector_node/corrected_image/compressed"
-               to="anti_instagram_node/corrected_image/compressed"/>
-        <remap from="merganser_line_detector_node/skeletons"
-               to="merganser_ground_projection_node/skeleton_in"/>
-        <remap from="merganser_bezier_node/skeletons"
-               to="merganser_ground_projection_node/skeleton_out"/>
-
-        <remap from="merganser_bezier_node/beziers" to="merganser_trajectory/beziers"/>
-        <remap from="merganser_trajectory/waypoint" to="merganser_purepursuit/waypoint"/>
-
-        <remap from="merganser_bezier_node/command" to="car_cmd_switch_node/cmd"/>
-        <remap from="merganser_purepursuit/command" to="car_cmd_switch_node/cmd"/>
-
-        <remap from="merganser_visualization_node/skeletons" to="merganser_ground_projection_node/skeleton_out"/>
-        <remap from="merganser_visualization_node/beziers" to="merganser_bezier_node/beziers"/>
-        <remap from="merganser_visualization_node/waypoint" to="merganser_trajectory/waypoint"/>
-
+        <!-- Anti Instagram node -->
         <include file="$(find anti_instagram)/launch/anti_instagram_node.launch">
             <arg name="veh" value="$(arg veh)"/>
             <arg name="ai_interval" value="$(arg ai_interval)"/>
         </include>
 
+        <!-- Line detection node -->
+        <remap from="merganser_line_detector_node/corrected_image/compressed"
+               to="anti_instagram_node/corrected_image/compressed"/>
         <include file="$(find merganser_line_detector)/launch/merganser_line_detector_node.launch">
             <arg name="veh" value="$(arg veh)"/>
             <arg name="verbose" value="$(arg verbose)"/>
         </include>
 
+        <!-- Bezier node -->
+        <remap from="merganser_bezier_node/command" to="car_cmd_switch_node/cmd"/>
         <include file="$(find merganser_bezier)/launch/merganser_bezier_node.launch">
             <arg name="veh" value="$(arg veh)"/>
             <arg name="verbose" value="$(arg verbose)"/>
         </include>
 
+        <!-- Ground projection node -->
+        <remap from="merganser_ground_projection_node/skeleton_in"
+               to="merganser_line_detector_node/skeletons"/>
+        <remap from="merganser_ground_projection_node/skeleton_out"
+               to="merganser_bezier_node/skeletons"/>
         <include file="$(find merganser_ground_projection)/launch/merganser_ground_projection_node.launch">
             <arg name="veh" value="$(arg veh)"/>
         </include>
 
+        <!-- Pure pursuit node -->
+        <remap from="merganser_purepursuit/command" to="car_cmd_switch_node/cmd"/>
+        <remap from="merganser_purepursuit/waypoint" to="merganser_trajectory/waypoint"/>
         <include file="$(find merganser_purepursuit)/launch/purepursuit_node.launch">
             <arg name="veh" value="$(arg veh)"/>
         </include>
 
+        <!-- Trajectory node -->
+        <remap from="merganser_trajectory/beziers" to="merganser_bezier_node/beziers"/>
         <include file="$(find merganser_purepursuit)/launch/trajectory_node.launch">
             <arg name="veh" value="$(arg veh)"/>
         </include>
 
+        <!-- Visualization node -->
+        <remap from="merganser_visualization_node/skeletons" to="merganser_ground_projection_node/skeleton_out"/>
+        <remap from="merganser_visualization_node/beziers" to="merganser_bezier_node/beziers"/>
+        <remap from="merganser_visualization_node/waypoint" to="merganser_trajectory/waypoint"/>
         <include file="$(find merganser_visualization)/launch/merganser_visualization_node.launch">
             <arg name="veh" value="$(arg veh)"/>
             <arg name="verbose" value="$(arg verbose)"/>
+        </include>
+
+        <!-- Kinematics node -->
+        <remap from="kinematics_node/car_cmd" to="lane_controller_node/car_cmd"/>
+        <remap from="kinematics_node/wheels_cmd" to="wheels_driver_node/wheels_cmd"/>
+        <include file="$(find dagu_car)/launch/kinematics_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="param_file_name" value="$(arg param_file_name)"/>
         </include>
     </group>
 
