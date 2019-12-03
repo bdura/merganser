@@ -63,7 +63,6 @@ class VisualizationNode(object):
 
     def setup_parameter(self, name, default):
         value = rospy.get_param(name, default)
-        rospy.set_param(name, value)
         return value
 
     def on_shutdown(self):
