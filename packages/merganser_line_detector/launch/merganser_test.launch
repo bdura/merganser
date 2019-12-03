@@ -23,7 +23,7 @@
         </include>
 
         <!-- Bezier node -->
-        <remap from="merganser_bezier_node/command" to="car_cmd_switch_node/cmd"/>
+        <remap from="merganser_bezier_node/command" to="merganser_purepursuit/command"/>
         <include file="$(find merganser_bezier)/launch/merganser_bezier_node.launch">
             <arg name="veh" value="$(arg veh)"/>
             <arg name="verbose" value="$(arg verbose)"/>
@@ -39,7 +39,6 @@
         </include>
 
         <!-- Pure pursuit node -->
-        <remap from="merganser_purepursuit/command" to="car_cmd_switch_node/cmd"/>
         <remap from="merganser_purepursuit/waypoint" to="merganser_trajectory/waypoint"/>
         <include file="$(find merganser_purepursuit)/launch/purepursuit_node.launch">
             <arg name="veh" value="$(arg veh)"/>
@@ -47,6 +46,7 @@
 
         <!-- Trajectory node -->
         <remap from="merganser_trajectory/beziers" to="merganser_bezier_node/beziers"/>
+        <remap from="merganser_trajectory/command" to="merganser_purepursuit/command"/>
         <include file="$(find merganser_purepursuit)/launch/trajectory_node.launch">
             <arg name="veh" value="$(arg veh)"/>
         </include>
@@ -61,7 +61,7 @@
         </include>
 
         <!-- Kinematics node -->
-        <remap from="kinematics_node/car_cmd" to="lane_controller_node/car_cmd"/>
+        <remap from="kinematics_node/car_cmd" to="merganser_purepursuit/command"/>
         <remap from="kinematics_node/wheels_cmd" to="wheels_driver_node/wheels_cmd"/>
         <include file="$(find dagu_car)/launch/kinematics_node.launch">
             <arg name="veh" value="$(arg veh)"/>

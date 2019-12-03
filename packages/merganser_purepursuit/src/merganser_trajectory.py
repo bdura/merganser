@@ -46,6 +46,9 @@ class TrajectoryNode(object):
 
         self.t = time.time()
 
+        self.dx = 0
+        self.dtheta = 0
+
         # Update the parameters
         self.update_params()
         rospy.Timer(rospy.Duration.from_sec(2.0), self.update_params)
