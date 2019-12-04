@@ -174,14 +174,14 @@ class TrajectoryNode(object):
 
             self.waypoint += self.alpha * (waypoint - self.waypoint)
 
+            marker = line_to_marker(waypoints,
+                                    color_to_rgba('green'),
+                                    name='trajectory_curve',
+                                    veh_name=self.veh_name)
+            self.pub_trajectory_marker.publish(marker)
+
         w = Point(x=self.waypoint[0], y=self.waypoint[1], z=0.)
         self.pub_waypoint.publish(w)
-
-        marker = line_to_marker(waypoints,
-                                color_to_rgba('green'),
-                                name='trajectory_curve',
-                                veh_name=self.veh_name)
-        self.pub_trajectory_marker.publish(marker)
 
         self.iters += 1
 
