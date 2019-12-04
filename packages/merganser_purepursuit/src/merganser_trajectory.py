@@ -32,7 +32,7 @@ def rotation(theta):
 
 
 def get_bezier_curve(message):
-    if message is None:
+    if message.fitted == 0:
         return None
     controls = message.controls
     c = np.array([[p.x, p.y] for p in controls])

@@ -16,19 +16,9 @@ COLORS = {
 }
 
 
-class CurveType(Enum):
-    left = 'white'
-    yellow = 'yellow'
-    right = 'right'
-    red = 'red'
-
-    default = 'gray'
-
-
 class Bezier(object):
 
-    def __init__(self, order, precision, reg=5e-3, process_noise=.01, loss_threshold=.001, color=-1,
-                 curve_type='default'):
+    def __init__(self, order, precision, reg=5e-3, process_noise=.01, loss_threshold=.001, color=-1):
         super(Bezier, self).__init__()
 
         self.bernstein = get_bernstein(precision=precision, order=order)
@@ -41,7 +31,6 @@ class Bezier(object):
         self.loss_threshold = loss_threshold
         self.filter = KalmanFilter(dimension=order, process_noise=process_noise)
 
-        self.type = CurveType[curve_type]
         self.color = color
 
         self.fitted = False
@@ -54,11 +43,11 @@ class Bezier(object):
             self.controls = np.random.normal(size=(order, 2))
         else:
 
-            n = len(cloud) // order + (len(cloud) % order > 0)
+            n = len(cloud) // order
 
             x_args = cloud[:, 0].argsort()
             x_controls = np.array([
-                cloud[x_args[i * n:(i + 1) * n]].mean(axis=0)
+                cloud[x_args[i * n:(i + 1) * n + (0 if i + 1 < order else len(cloud) % order)]].mean(axis=0)
                 for i in range(order)]
             )
 
@@ -67,7 +56,7 @@ class Bezier(object):
 
             y_args = cloud[:, 1].argsort()
             y_controls = np.array([
-                cloud[y_args[i * n:(i + 1) * n]].mean(axis=0)
+                cloud[y_args[i * n:(i + 1) * n + (0 if i + 1 < order else len(cloud) % order)]].mean(axis=0)
                 for i in range(order)]
             )
 
@@ -77,7 +66,7 @@ class Bezier(object):
             if y_loss > x_loss:
                 self.controls = x_controls
 
-            self.extrapolate(-.1, 1.1)
+            self.extrapolate(-.05, 1.05)
 
     def __call__(self):
         return np.matmul(self.bernstein, self.controls)
@@ -155,10 +144,11 @@ class Bezier(object):
         self.controls = self.filter.mu.reshape((len(self.controls), 2))
 
     def correct(self, cloud):
-        self.filter.correct(cloud)
-        self.controls = self.filter.mu.reshape((len(self.controls), 2))
+        if self.fitted:
+            self.filter.correct(cloud)
+            self.controls = self.filter.mu.reshape((len(self.controls), 2))
 
-        if self.loss(cloud) > self.loss_threshold:
+        if not self.fitted or self.loss(cloud) > self.loss_threshold:
             self.collapse(cloud)
 
         self.fitted = True

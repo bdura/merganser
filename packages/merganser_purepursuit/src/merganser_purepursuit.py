@@ -1,14 +1,10 @@
 #!/usr/bin/env python
-import json
 
 import numpy as np
 import rospy
-from cv_bridge import CvBridge
-from duckietown_msgs.msg import SegmentList, LanePose, BoolStamped, Twist2DStamped, FSMState
+from duckietown_msgs.msg import SegmentList, BoolStamped, Twist2DStamped
 from duckietown_utils.instantiate_utils import instantiate
-from sensor_msgs.msg import Image
 from geometry_msgs.msg import Point
-from std_msgs.msg import Float32, String
 
 
 def collapse(angle):

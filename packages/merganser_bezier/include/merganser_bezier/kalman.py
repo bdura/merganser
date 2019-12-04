@@ -1,14 +1,13 @@
 import numpy as np
-from .utils.kinematics import rotation
-
 from scipy.linalg import block_diag
-from .utils.bernstein import compute_curve, get_bernstein
+
+from .utils.bernstein import get_bernstein
+from .utils.kinematics import rotation
 
 
 class KalmanFilter(object):
 
     def __init__(self, dimension=4, process_noise=.1):
-
         self.dimension = dimension
 
         self.mu = np.empty(dimension * 2)

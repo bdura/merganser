@@ -9,7 +9,7 @@ from duckietown_msgs.msg import Twist2DStamped
 from merganser_bezier.bezier import Bezier
 from merganser_bezier.utils.plots import plot_fitted_skeleton
 from merganser_bezier.utils.skeletons import extract_skeleton, Color, make_bezier_message
-from merganser_msgs.msg import BezierMsg, SkeletonsMsg, BeziersMsg
+from merganser_msgs.msg import SkeletonsMsg, BeziersMsg
 from sensor_msgs.msg import Image
 
 
@@ -46,9 +46,9 @@ class BezierNode(object):
         # Attributes
         self.steps = 0
 
-        self.left = Bezier(4, 20, color=0)
-        self.yellow = Bezier(4, 20, color=1)
-        self.right = Bezier(4, 20, color=0)
+        self.left = Bezier(4, 20)
+        self.yellow = Bezier(4, 20)
+        self.right = Bezier(4, 20)
 
         self.beziers = [self.left, self.yellow, self.right]
 
@@ -228,14 +228,14 @@ class BezierNode(object):
 
         # Predicts and extends the bezier curves
         self._predict()
-        self._extend_beziers()
+        # self._extend_beziers()
 
         # Gets the skeletons
         skeletons = skeletons_msg.skeletons
         skeletons = [extract_skeleton(s) for s in skeletons]
 
-        yellows = [s for s, c in skeletons if c == Color.yellow]
-        whites = [s for s, c in skeletons if c == Color.white]
+        yellows = [s for s, c in skeletons if c == Color.yellow and len(s) > 10]
+        whites = [s for s, c in skeletons if c == Color.white and len(s) > 10]
 
         # Process the yellow line first
         self._process_yellows(yellows)
