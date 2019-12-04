@@ -1,0 +1,50 @@
+<launch>
+    <arg name="veh" default="$(env VEHICLE_NAME)"/>
+    <arg name="ai_trafo_mode" default="cb"
+         doc="'cb' for colo balance only; 'both' for color balance and linear trafo"/>
+    <arg name="ai_interval" default="5"
+         doc="interval with which the linear trafo gets updated. color balance is performed every second."/>
+    <arg name="verbose" default="false"/>
+
+    <group>
+        <include file="$(find anti_instagram)/launch/anti_instagram_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="ai_interval" value="$(arg ai_interval)"/>
+        </include>
+
+        <remap from="merganser_line_detector_node/corrected_image/compressed"
+               to="anti_instagram_node/corrected_image/compressed"/>
+        <remap from="merganser_line_detector_node/skeletons"
+               to="merganser_ground_projection_node/skeleton_in"/>
+        <remap from="merganser_bezier_node/skeletons"
+               to="merganser_ground_projection_node/skeleton_out"/>
+        <include file="$(find merganser_line_detector)/launch/merganser_line_detector_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="verbose" value="$(arg verbose)"/>
+        </include>
+
+        <include file="$(find merganser_ground_projection)/launch/merganser_ground_projection_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+        </include>
+
+        <remap from="lf_pure_pursuit_node/skeletons" to="merganser_ground_projection_node/skeleton_out"/>
+        <include file="$(find lf_pure_pursuit)/launch/lf_pure_pursuit_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="verbose" value="$(arg verbose)"/>
+        </include>
+
+        <remap from="merganser_visualization_node/skeletons" to="merganser_ground_projection_node/skeleton_out"/>
+        <include file="$(find merganser_visualization)/launch/merganser_visualization_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="verbose" value="$(arg verbose)"/>
+        </include>
+
+        <remap from="kinematics_node/car_cmd" to="lf_pure_pursuit_node/car_cmd"/>
+        <remap from="kinematics_node/wheels_cmd" to="wheels_driver_node/wheels_cmd"/>
+        <include file="$(find dagu_car)/launch/kinematics_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="param_file_name" value="$(arg veh)"/>
+        </include>
+    </group>
+
+</launch>
