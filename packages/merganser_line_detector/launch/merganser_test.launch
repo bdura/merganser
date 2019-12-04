@@ -9,6 +9,7 @@
     <arg name="param_file_name" default="default"/>
 
     <!-- Anti Instagram node -->
+    <remap from="anti_instagram_node/uncorrected_image/compressed" to="camera_node/image/compressed"/>
     <include file="$(find anti_instagram)/launch/anti_instagram_node.launch">
         <arg name="veh" value="$(arg veh)"/>
         <arg name="ai_interval" value="$(arg ai_interval)"/>
