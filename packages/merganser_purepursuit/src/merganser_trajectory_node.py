@@ -77,7 +77,7 @@ class TrajectoryNode(object):
     def update_params(self, _event=None):
 
         self.lookahead = rospy.get_param('~lookahead', .3)
-        self.correction = rospy.get_param('~correction', .1)
+        self.correction = rospy.get_param('~correction', .2)
         self.alpha = rospy.get_param('~alpha', .8)
         self.veh_name = rospy.get_param('~veh', 'default')
 

@@ -36,7 +36,7 @@ class PurePursuitNode(object):
 
     def update_params(self, _event):
 
-        self.v0 = rospy.get_param('~v0', .0)
+        self.v0 = rospy.get_param('~v0', .3)
 
     def process_waypoint(self, point):
         x, y = point.x, point.y
