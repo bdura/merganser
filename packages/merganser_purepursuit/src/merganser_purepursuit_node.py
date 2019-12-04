@@ -34,11 +34,15 @@ class PurePursuitNode(object):
         # timer for updating the params
         self.timer = rospy.Timer(rospy.Duration.from_sec(2.0), self.update_params)
 
+        self.prev_v, self.prev_omega = self.v0, 0.
+
     def update_params(self, _event):
 
         self.v0 = rospy.get_param('~v0', .3)
 
     def process_waypoint(self, point):
+        self.publish_command(self.prev_v, self.prev_omega)
+
         x, y = point.x, point.y
 
         alpha = np.arctan2(y, x)
@@ -46,11 +50,11 @@ class PurePursuitNode(object):
         v = self.v0 / (1 + alpha ** 2)
         omega = 2 * v * np.sin(alpha) / np.sqrt(x ** 2 + y ** 2)
 
+        self.prev_v, self.prev_omega = v, omega
+
         self.publish_command(v, omega)
 
     def publish_command(self, v, omega):
-        if v == 0.:
-            return
         message = Twist2DStamped()
         message.v = v
         message.omega = omega

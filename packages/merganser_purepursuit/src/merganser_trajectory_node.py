@@ -111,8 +111,8 @@ class TrajectoryNode(object):
     def process_beziers(self, message):
         points = []
 
-        if len(message.beziers) == 0:
-            return
+        # if len(message.beziers) == 0:
+        #     return
 
         beziers = []
 
@@ -159,31 +159,29 @@ class TrajectoryNode(object):
         else:
             waypoints = None
 
+        # Constructs the rotation matrix
+        r = rotation(- self.dtheta)
+
+        # Constructs the offset
+        offset = np.zeros(2)
+        offset[0] = - self.dx
+
+        self.waypoint = np.matmul(r, self.waypoint + offset)
+
         if waypoints is not None:
-
             arg = np.abs(np.linalg.norm(waypoints, axis=1) - self.lookahead).argmin()
-
             waypoint = waypoints[arg]
-
-            # Constructs the rotation matrix
-            r = rotation(- self.dtheta)
-
-            # Constructs the offset
-            offset = np.zeros(2)
-            offset[0] = - self.dx
-
-            self.waypoint = np.matmul(r, self.waypoint + offset)
 
             self.waypoint += self.alpha * (waypoint - self.waypoint)
 
-            w = Point(self.waypoint[0], self.waypoint[1], 0)
-            self.pub_waypoint.publish(w)
+        w = Point(x=self.waypoint[0], y=self.waypoint[1], z=0.)
+        self.pub_waypoint.publish(w)
 
-            marker = line_to_marker(waypoints,
-                                    color_to_rgba('green'),
-                                    name='trajectory_curve',
-                                    veh_name=self.veh_name)
-            self.pub_trajectory_marker.publish(marker)
+        marker = line_to_marker(waypoints,
+                                color_to_rgba('green'),
+                                name='trajectory_curve',
+                                veh_name=self.veh_name)
+        self.pub_trajectory_marker.publish(marker)
 
         self.iters += 1
 
