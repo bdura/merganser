@@ -18,6 +18,7 @@
   <build_depend>geometry_msgs</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>duckietown_msgs</build_depend>
+  <build_depend>merganser_msgs</build_depend>
   <build_depend>message_generation</build_depend>
   <build_depend>yaml-cpp</build_depend>
   <build_depend>image_geometry</build_depend>
@@ -31,6 +32,7 @@
   <run_depend>geometry_msgs</run_depend>
   <run_depend>std_msgs</run_depend>
   <run_depend>duckietown_msgs</run_depend>
+  <run_depend>merganser_msgs</run_depend>
   <run_depend>message_runtime</run_depend>
   <run_depend>yaml-cpp</run_depend>
   <run_depend>image_geometry</run_depend>

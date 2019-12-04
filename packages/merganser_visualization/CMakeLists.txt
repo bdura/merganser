@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   visualization_msgs
   geometry_msgs
+  merganser_msgs
 )
 
 catkin_python_setup()
