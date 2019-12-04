@@ -5,6 +5,7 @@ import rospy
 import duckietown_utils as dtu
 
 from duckietown_msgs.msg import Twist2DStamped
+from geometry_msgs.msg import Point
 
 from merganser_msgs.msg import SkeletonsMsg
 from lf_pure_pursuit.utils import follow_point_to_velocities, Velocities
@@ -54,15 +55,16 @@ class PurePursuitNode(object):
                                            queue_size=1)
 
         # Subscribers
-        self.sub_skeletons = rospy.Subscriber('~skeletons',
-                                              SkeletonsMsg,
+        self.sub_skeletons = rospy.Subscriber('~waypoint',
+                                              Point,
                                               self.update_cmd,
                                               queue_size=1)
 
         self.loginfo('Initialized')
 
-    def update_cmd(self, skeletons_msg):
-        follow_point = None # TODO
+    def update_cmd(self, point_msg):
+        self.publish_cmd(self.previous)
+        follow_point = np.asarray([point_msg.x, point_msg.y])
         velocities = follow_point_to_velocities(follow_point,
                                                 self.previous,
                                                 v_max=self.v_max,
