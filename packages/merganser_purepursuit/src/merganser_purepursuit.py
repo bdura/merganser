@@ -33,10 +33,12 @@ class PurePursuitNode(object):
         # timer for updating the params
         self.timer = rospy.Timer(rospy.Duration.from_sec(2.0), self.update_params)
 
+        # self.publish_command(.1, 0)
+
         # We need to start the simulation...
         rospy.Timer(rospy.Duration.from_sec(2.0), self.kickstart)
 
-    def kickstart(self):
+    def kickstart(self, event):
         if self.idle:
             self.publish_command(.1, 0)
 
