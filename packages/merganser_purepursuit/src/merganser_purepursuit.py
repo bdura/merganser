@@ -22,10 +22,7 @@ class PurePursuitNode(object):
 
         self.v0 = 1.5
 
-        self.turn = False
-        self.t_turn = 0
-        self.t_turn_max = 10
-        self.alpha_turn = np.pi / 5
+        self.idle = True
 
         # Subscriber
         self.sub_waypoint = rospy.Subscriber('~waypoint', Point, self.process_waypoint)
@@ -37,15 +34,19 @@ class PurePursuitNode(object):
         self.timer = rospy.Timer(rospy.Duration.from_sec(2.0), self.update_params)
 
         # We need to start the simulation...
-        self.publish_command(.1, 0)
+        rospy.Timer(rospy.Duration.from_sec(2.0), self.kickstart)
+
+    def kickstart(self):
+        if self.idle:
+            self.publish_command(.1, 0)
 
     def update_params(self, _event):
 
         self.v0 = rospy.get_param('~v0', 3)
-        self.t_turn_max = rospy.get_param('~t_turn_max', .0)
-        self.alpha_turn = rospy.get_param('~t_turn_max', np.pi / 5)
 
     def process_waypoint(self, point):
+        self.idle = False
+
         x, y = point.x, point.y
 
         alpha = np.arctan2(y, x)
