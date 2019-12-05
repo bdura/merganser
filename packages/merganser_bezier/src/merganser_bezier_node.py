@@ -109,9 +109,9 @@ class BezierNode(object):
         rospy.loginfo('[%s] %s' % (self.node_name, message))
 
     def _extend_beziers(self):
-        self.left.extrapolate(0 - self.extension, 1 + self.extension)
-        self.right.extrapolate(0 - self.extension, 1 + self.extension)
-        self.yellow.extrapolate(0 - self.extension, 1 + self.extension)
+        self.left.extrapolate(0 + self.extension, 1 + self.extension)
+        self.right.extrapolate(0 + self.extension, 1 + self.extension)
+        self.yellow.extrapolate(0 + self.extension, 1 + self.extension)
 
     def _predict(self):
         self.left.predict(self.dx, self.dtheta)

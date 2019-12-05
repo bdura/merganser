@@ -18,7 +18,7 @@ COLORS = {
 
 class Bezier(object):
 
-    def __init__(self, order, precision, reg=5e-3, process_noise=.01, loss_threshold=.001, color=-1):
+    def __init__(self, order, precision, reg=5e-3, process_noise=.01, loss_threshold=.0001, color=-1):
         super(Bezier, self).__init__()
 
         self.bernstein = get_bernstein(precision=precision, order=order)
@@ -150,6 +150,9 @@ class Bezier(object):
 
         if not self.fitted or self.loss(cloud) > self.loss_threshold:
             self.collapse(cloud)
+
+        if self.controls[0, 0] > self.controls[-1, 0]:
+            self.controls = self.controls[::-1]
 
         self.fitted = True
 

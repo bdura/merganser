@@ -5,6 +5,7 @@ import rospy
 from duckietown_msgs.msg import SegmentList, BoolStamped, Twist2DStamped
 from duckietown_utils.instantiate_utils import instantiate
 from geometry_msgs.msg import Point
+from std_msgs.msg import Float32
 
 
 def collapse(angle):
@@ -19,7 +20,12 @@ class PurePursuitNode(object):
     def __init__(self):
         self.node_name = "PurePursuit Node"
 
-        self.v0 = .1
+        self.v0 = 1.5
+
+        self.turn = False
+        self.t_turn = 0
+        self.t_turn_max = 10
+        self.alpha_turn = np.pi / 5
 
         # Subscriber
         self.sub_waypoint = rospy.Subscriber('~waypoint', Point, self.process_waypoint)
@@ -30,16 +36,23 @@ class PurePursuitNode(object):
         # timer for updating the params
         self.timer = rospy.Timer(rospy.Duration.from_sec(2.0), self.update_params)
 
+        # We need to start the simulation...
+        self.publish_command(.1, 0)
+
     def update_params(self, _event):
 
-        self.v0 = rospy.get_param('~v0', .0)
+        self.v0 = rospy.get_param('~v0', 3)
+        self.t_turn_max = rospy.get_param('~t_turn_max', .0)
+        self.alpha_turn = rospy.get_param('~t_turn_max', np.pi / 5)
 
     def process_waypoint(self, point):
         x, y = point.x, point.y
 
         alpha = np.arctan2(y, x)
+        alpha = collapse(alpha)
 
-        v = self.v0 / (1 + alpha ** 2)
+        v = max(self.v0 * np.abs(np.cos(alpha)), .2)
+
         omega = 2 * v * np.sin(alpha) / np.sqrt(x ** 2 + y ** 2)
 
         self.publish_command(v, omega)

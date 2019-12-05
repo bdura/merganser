@@ -1,0 +1,71 @@
+<launch>
+    <arg name="veh" default="$(env VEHICLE_NAME)"/>
+    <arg name="ai_trafo_mode" default="cb" doc="'cb' for colo balance only; 'both' for color balance and linear trafo"/>
+    <arg name="ai_interval" default="5" doc="interval with which the linear trafo gets updated. color balance is performed every second."/>
+    <arg name="verbose" default="true"/>
+
+    <!-- start basic args -->
+    <include file="$(find duckietown_demos)/launch/master.launch">
+        <arg name="veh" value="$(arg veh)"/>
+        <arg name="visualization" default="true" />
+        <!--arg name="verbose" value="$(arg verbose)" /-->
+        <arg name="/camera/raw" default="true" />
+        <arg name="param_file_name" default="default" />
+        <arg name="line_detector_param_file_name" default="default" />
+        <arg name="anti_instagram" default="true" />
+        <arg name="ai_trafo_mode" value="$(arg ai_trafo_mode)"/>
+        <arg name="ai_interval" value="$(arg ai_interval)"/>
+        <arg name="/lane_following/stop_line_filter" default="false" /> <!-- will not every allow a transition into COORDINATION mode -->
+        <arg name="vehicle_avoidance" default="false"/>
+    </include>
+
+    <group>
+        <!-- Line detection node -->
+        <remap from="merganser_line_detector_node/corrected_image/compressed"
+               to="anti_instagram_node/corrected_image/compressed"/>
+        <include file="$(find merganser_line_detector)/launch/merganser_line_detector_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="verbose" value="$(arg verbose)"/>
+        </include>
+
+        <!-- Bezier node -->
+        <remap from="merganser_bezier_node/command" to="merganser_purepursuit/command"/>
+        <include file="$(find merganser_bezier)/launch/merganser_bezier_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="verbose" value="$(arg verbose)"/>
+        </include>
+
+        <!-- Ground projection node -->
+        <remap from="merganser_ground_projection_node/skeleton_in"
+               to="merganser_line_detector_node/skeletons"/>
+        <remap from="merganser_ground_projection_node/skeleton_out"
+               to="merganser_bezier_node/skeletons"/>
+        <include file="$(find merganser_ground_projection)/launch/merganser_ground_projection_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+        </include>
+
+        <!-- Pure pursuit node -->
+        <remap from="merganser_purepursuit/waypoint" to="merganser_trajectory/waypoint"/>
+        <remap from="merganser_purepursuit/command" to="car_cmd_switch_node/cmd"/>
+        <include file="$(find merganser_purepursuit)/launch/purepursuit_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+        </include>
+
+        <!-- Trajectory node -->
+        <remap from="merganser_trajectory/beziers" to="merganser_bezier_node/beziers"/>
+        <remap from="merganser_trajectory/command" to="merganser_purepursuit/command"/>
+        <include file="$(find merganser_purepursuit)/launch/trajectory_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+        </include>
+
+        <!-- Visualization node -->
+        <remap from="merganser_visualization_node/skeletons" to="merganser_ground_projection_node/skeleton_out"/>
+        <remap from="merganser_visualization_node/beziers" to="merganser_bezier_node/beziers"/>
+        <remap from="merganser_visualization_node/waypoint" to="merganser_trajectory/waypoint"/>
+        <include file="$(find merganser_visualization)/launch/merganser_visualization_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="verbose" value="$(arg verbose)"/>
+        </include>
+    </group>
+
+</launch>
