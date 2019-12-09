@@ -220,6 +220,15 @@ class BezierNode(object):
             self.left.unfit()
             self.right.unfit()
 
+    def publish(self):
+
+        message = BeziersMsg()
+        message.left = make_bezier_message(self.left)
+        message.yellow = make_bezier_message(self.yellow)
+        message.right = make_bezier_message(self.right)
+
+        self.pub_bezier.publish(message)
+
     def process(self, skeletons_msg):
 
         t0 = time.time()
@@ -251,16 +260,12 @@ class BezierNode(object):
 
         self.stats.processed()
         self.intermittent_counter += 1
+
         if self.intermittent_log_now():
             self.intermittent_log(self.stats.info())
             self.stats.reset()
 
-        message = BeziersMsg()
-        message.left = make_bezier_message(self.left)
-        message.yellow = make_bezier_message(self.yellow)
-        message.right = make_bezier_message(self.right)
-
-        self.pub_bezier.publish(message)
+        self.publish()
 
         t = time.time() - t0
 
@@ -275,15 +280,15 @@ class BezierNode(object):
         self.loginfo('%3d:%s' % (self.intermittent_counter, s))
         self.loginfo('Mean process time : %.2f ms.' % (self.time * 1000))
 
-        self.loginfo('verbose %s' % (self.verbose,))
-        self.loginfo('refit_every %s' % (self.refit_every,))
-        self.loginfo('loss_threshold %s' % (self.loss_threshold,))
-        self.loginfo('reg %s' % (self.reg,))
-        self.loginfo('lr %s' % (self.lr,))
-        self.loginfo('extension %s' % (self.extension,))
-        self.loginfo('curve_precision %s' % (self.curve_precision,))
-        self.loginfo('fitting_steps %s' % (self.fitting_steps,))
-        self.loginfo('eps %s' % (self.eps,))
+        # self.loginfo('verbose %s' % (self.verbose,))
+        # self.loginfo('refit_every %s' % (self.refit_every,))
+        # self.loginfo('loss_threshold %s' % (self.loss_threshold,))
+        # self.loginfo('reg %s' % (self.reg,))
+        # self.loginfo('lr %s' % (self.lr,))
+        # self.loginfo('extension %s' % (self.extension,))
+        # self.loginfo('curve_precision %s' % (self.curve_precision,))
+        # self.loginfo('fitting_steps %s' % (self.fitting_steps,))
+        # self.loginfo('eps %s' % (self.eps,))
 
     def on_shutdown(self):
         self.loginfo('Shutdown...')

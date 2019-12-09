@@ -21,6 +21,7 @@ class PurePursuitNode(object):
         self.node_name = "PurePursuit Node"
 
         self.v0 = 1.5
+        self.vmin = .2
 
         self.idle = True
 
@@ -45,6 +46,7 @@ class PurePursuitNode(object):
     def update_params(self, _event):
 
         self.v0 = rospy.get_param('~v0', 3)
+        self.vmin = rospy.get_param('~vmin', .2)
 
     def process_waypoint(self, point):
         self.idle = False
@@ -54,15 +56,13 @@ class PurePursuitNode(object):
         alpha = np.arctan2(y, x)
         alpha = collapse(alpha)
 
-        v = max(self.v0 * np.abs(np.cos(alpha)), .2)
+        v = max(self.v0 / (1 + alpha ** 2), self.vmin)
 
         omega = 2 * v * np.sin(alpha) / np.sqrt(x ** 2 + y ** 2)
 
         self.publish_command(v, omega)
 
     def publish_command(self, v, omega):
-        if v == 0.:
-            return
         message = Twist2DStamped()
         message.v = v
         message.omega = omega

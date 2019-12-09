@@ -70,7 +70,6 @@ class TrajectoryNode(object):
 
         # Publisher
         self.pub_waypoint = rospy.Publisher('~waypoint', Point, queue_size=1)
-        self.pub_image = rospy.Publisher('~image', Image, queue_size=1)
         self.pub_trajectory_marker = rospy.Publisher('~trajectory_marker', Marker, queue_size=1)
 
         # Subscriber
@@ -124,42 +123,36 @@ class TrajectoryNode(object):
         right = get_bezier_curve(message.right)
 
         if left is None and yellow is None and right is None:
-            return
-
-        if yellow is not None and right is not None:
-            waypoints = (yellow() + right()) / 2
-
-        elif yellow is not None:
-            waypoints = yellow() - self.correction * yellow.normal() * .9
-
-        elif right is not None:
-            waypoints = right() + self.correction * right.normal() * .9
+            pass
 
         else:
-            waypoints = left() - 2 * self.correction * left.normal() * .9
 
-        arg = np.abs(np.linalg.norm(waypoints, axis=1) - self.lookahead).argmin()
+            if yellow is not None and right is not None:
+                waypoints = (yellow() + right()) / 2
 
-        waypoint = waypoints[arg]
+            elif yellow is not None:
+                waypoints = yellow() - self.correction * yellow.normal() * .9
 
-        self.waypoint += self.alpha * (waypoint - self.waypoint)
+            elif right is not None:
+                waypoints = right() + self.correction * right.normal() * .9
+
+            else:
+                waypoints = left() - 2 * self.correction * left.normal() * .9
+
+            arg = np.abs(np.linalg.norm(waypoints, axis=1) - self.lookahead).argmin()
+
+            waypoint = waypoints[arg]
+
+            self.waypoint += self.alpha * (waypoint - self.waypoint)
+
+            marker = line_to_marker(waypoints,
+                                    color_to_rgba('green'),
+                                    name='trajectory_curve',
+                                    veh_name=self.veh_name)
+            self.pub_trajectory_marker.publish(marker)
 
         w = Point(self.waypoint[0], self.waypoint[1], 0)
         self.pub_waypoint.publish(w)
-
-        marker = line_to_marker(waypoints,
-                                color_to_rgba('green'),
-                                name='trajectory_curve',
-                                veh_name=self.veh_name)
-        self.pub_trajectory_marker.publish(marker)
-
-        self.iters += 1
-
-        if self.verbose and self.iters % 10 == 0:
-            img = plot_waypoint(beziers, self.waypoint, waypoints)
-            img_message = self.bridge.cv2_to_imgmsg(img, 'bgr8')
-
-            self.pub_image.publish(img_message)
 
     def log(self, s):
         rospy.loginfo('[%s] %s' % (self.node_name, s))
