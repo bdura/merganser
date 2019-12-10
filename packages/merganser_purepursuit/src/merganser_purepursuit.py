@@ -22,6 +22,7 @@ class PurePursuitNode(object):
 
         self.v0 = 1.5
         self.vmin = .2
+        self.gamma = 1.
 
         self.idle = True
 
@@ -47,18 +48,26 @@ class PurePursuitNode(object):
 
         self.v0 = rospy.get_param('~v0', 3)
         self.vmin = rospy.get_param('~vmin', .2)
+        self.gamma = rospy.get_param('~gamma', 3.)
 
     def process_waypoint(self, point):
         self.idle = False
 
         x, y = point.x, point.y
 
+        if x < 0:
+            y = .1 * np.sign(y)
+            x = 0
+
         alpha = np.arctan2(y, x)
         alpha = collapse(alpha)
 
-        v = max(self.v0 / (1 + alpha ** 2), self.vmin)
+        v = max(self.v0 / (1 + self.gamma * alpha ** 2), self.vmin)
 
-        omega = 2 * v * np.sin(alpha) / np.sqrt(x ** 2 + y ** 2)
+        lookahead = np.sqrt(x ** 2 + y ** 2)
+        lookahead = 1 if lookahead == 0. else lookahead
+
+        omega = 2 * v * np.sin(alpha) / lookahead
 
         self.publish_command(v, omega)
 
@@ -70,7 +79,7 @@ class PurePursuitNode(object):
 
     def on_shutdown(self):
         self.publish_command(0, 0)
-        rospy.log('Shutting down.')
+        self.log('Shutting down.')
 
     def log(self, s):
         rospy.loginfo('[%s] %s' % (self.node_name, s))

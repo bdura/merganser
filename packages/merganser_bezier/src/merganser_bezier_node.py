@@ -189,7 +189,7 @@ class BezierNode(object):
                     argsort = best.argsort()[:2]
 
                     loss = loss[argsort]
-                    whites = whites[argsort]
+                    whites = [c for i, c in enumerate(whites) if i in argsort]
 
                 lr_loss = loss.diagonal().sum()
                 rl_loss = loss.sum() - lr_loss
