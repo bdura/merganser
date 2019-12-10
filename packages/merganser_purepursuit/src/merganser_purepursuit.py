@@ -46,7 +46,7 @@ class PurePursuitNode(object):
 
     def update_params(self, _event):
 
-        self.v0 = rospy.get_param('~v0', 1.)
+        self.v0 = rospy.get_param('~v0', .2)
         self.vmin = rospy.get_param('~vmin', .2)
         self.gamma = rospy.get_param('~gamma', 2.)
 
