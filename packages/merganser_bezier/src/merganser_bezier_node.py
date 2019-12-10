@@ -185,9 +185,11 @@ class BezierNode(object):
             else:
 
                 if len(loss) > 2:
-                    argsort = loss.min(axis=1).argsort()
-                    loss = loss[argsort[:2]]
-                    whites = whites[argsort[:2]]
+                    best = np.min(loss, axis=1)
+                    argsort = best.argsort()[:2]
+
+                    loss = loss[argsort]
+                    whites = whites[argsort]
 
                 lr_loss = loss.diagonal().sum()
                 rl_loss = loss.sum() - lr_loss

@@ -139,6 +139,9 @@ class TrajectoryNode(object):
             else:
                 waypoints = left() - 2 * self.correction * left.normal() * .9
 
+            norm = np.linalg.norm(waypoints, axis=1)
+            print(norm)
+            # arg = (norm < self.lookahead)[::-1].argmax() - len(norm) + 1
             arg = np.abs(np.linalg.norm(waypoints, axis=1) - self.lookahead).argmin()
 
             waypoint = waypoints[arg]
